@@ -1,759 +1,718 @@
 // ============================================
-// User Management Component
+// USER MANAGEMENT - COMPLETE FRESH START
+// File: src/components/admin/UserManagement.tsx
 // ============================================
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   Box,
   Button,
-  Card,
-  CardBody,
-  CardHeader,
-  FormControl,
-  FormLabel,
-  Heading,
-  HStack,
-  Input,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  Select,
   Table,
-  Tbody,
-  Td,
-  Th,
   Thead,
+  Tbody,
   Tr,
-  useDisclosure,
-  useToast,
-  VStack,
-  Text,
+  Th,
+  Td,
   Badge,
   IconButton,
-  AlertDialog,
-  AlertDialogBody,
-  AlertDialogContent,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogOverlay,
-  InputGroup,
-  InputLeftElement,
-  Menu,
-  MenuButton,
-  MenuList,
-  MenuItem,
-  Stat,
-  StatLabel,
-  StatNumber,
-  Grid,
-  Switch,
-  Tooltip,
+  useToast,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalCloseButton,
+  FormControl,
+  FormLabel,
+  Input,
+  Select,
+  VStack,
+  HStack,
+  Text,
   Spinner,
+  Card,
+  CardHeader,
+  CardBody,
+  Heading,
 } from "@chakra-ui/react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  getUsers,
-  createUser,
-  updateUser,
-  deleteUser,
-  activateUser,
-  deactivateUser,
-  getUserStatistics,
-  type CreateUserParams,
-  type UserFilters,
-} from "@/api/users.api";
-import { getDepartments } from "@/api/departments.api";
-import type { UserRole } from "@/types/models";
-import { formatDate } from "@/utils/date.utils";
+import { EditIcon, DeleteIcon, AddIcon } from "@chakra-ui/icons";
+import { supabase } from "@/lib/supabase";
 
 // ============================================
-// USER FORM COMPONENT
+// TYPES
 // ============================================
 
-interface UserFormProps {
-  user?: any;
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
+type UserRole = "staff" | "director" | "hr" | "admin";
+
+interface User {
+  id: string;
+  email: string;
+  full_name: string;
+  role: UserRole;
+  department_id: string | null;
+  hire_date: string;
+  is_active: boolean;
+  created_at: string;
 }
 
-function UserForm({ user, isOpen, onClose, onSuccess }: UserFormProps) {
-  const [email, setEmail] = useState(user?.email || "");
-  const [fullName, setFullName] = useState(user?.full_name || "");
-  const [password, setPassword] = useState("");
-  const [role, setRole] = useState<UserRole>(user?.role || "staff");
-  const [departmentId, setDepartmentId] = useState(user?.department_id || "");
-  const [hireDate, setHireDate] = useState(
-    user?.hire_date || new Date().toISOString().split("T")[0]
-  );
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const toast = useToast();
+interface Department {
+  id: string;
+  name: string;
+  code: string;
+}
 
-  // Fetch departments
-  const { data: departments } = useQuery({
-    queryKey: ["departments"],
-    queryFn: getDepartments,
+// ============================================
+// USER MANAGEMENT COMPONENT
+// ============================================
+
+export function UserManagement() {
+  const toast = useToast();
+  const [users, setUsers] = useState<User[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+
+  // Form state
+  const [formData, setFormData] = useState({
+    email: "",
+    full_name: "",
+    password: "",
+    role: "staff" as UserRole,
+    department_id: "",
+    hire_date: new Date().toISOString().split("T")[0],
   });
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  // ============================================
+  // FETCH DATA
+  // ============================================
 
-    // Validation
-    if (!email || !fullName || !role || !departmentId || !hireDate) {
-      toast({
-        title: "Validation Error",
-        description: "Please fill in all required fields",
-        status: "error",
-        duration: 3000,
-      });
-      return;
-    }
-
-    if (!user && !password) {
-      toast({
-        title: "Validation Error",
-        description: "Password is required for new users",
-        status: "error",
-        duration: 3000,
-      });
-      return;
-    }
-
-    if (!user && password.length < 8) {
-      toast({
-        title: "Validation Error",
-        description: "Password must be at least 8 characters",
-        status: "error",
-        duration: 3000,
-      });
-      return;
-    }
-
-    setIsSubmitting(true);
-
+  const fetchUsers = async () => {
     try {
-      if (user) {
-        // Update existing user
-        await updateUser(user.id, {
-          full_name: fullName,
-          role,
-          department_id: departmentId,
-        });
-        toast({
-          title: "User updated",
-          description: `${fullName} has been updated successfully`,
-          status: "success",
-          duration: 3000,
-        });
-      } else {
-        // Create new user
-        await createUser({
-          email,
-          full_name: fullName,
-          password,
-          role,
-          department_id: departmentId,
-          hire_date: hireDate,
-        });
-        toast({
-          title: "User created",
-          description: `${fullName} has been created successfully`,
-          status: "success",
-          duration: 3000,
-        });
-      }
-      onSuccess();
-      onClose();
+      const { data, error } = await supabase
+        .from("users")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error) throw error;
+
+      console.log("Fetched users:", data);
+      setUsers(data || []);
     } catch (error: any) {
+      console.error("Error fetching users:", error);
       toast({
-        title: "Error",
+        title: "Error loading users",
         description: error.message,
         status: "error",
         duration: 5000,
       });
     } finally {
-      setIsSubmitting(false);
+      setLoading(false);
     }
   };
 
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} size="lg">
-      <ModalOverlay />
-      <ModalContent>
-        <form onSubmit={handleSubmit}>
-          <ModalHeader>{user ? "Edit User" : "Create New User"}</ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={4}>
-              <FormControl isRequired>
-                <FormLabel>Full Name</FormLabel>
-                <Input
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  placeholder="e.g., John Doe"
-                />
-              </FormControl>
+  const fetchDepartments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from("departments")
+        .select("id, name, code")
+        .order("name");
 
-              <FormControl isRequired>
-                <FormLabel>Email</FormLabel>
-                <Input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="e.g., john.doe@company.com"
-                  isDisabled={!!user}
-                />
-                {user && (
-                  <Text fontSize="xs" color="gray.500" mt={1}>
-                    Email cannot be changed after creation
-                  </Text>
-                )}
-              </FormControl>
-
-              {!user && (
-                <FormControl isRequired>
-                  <FormLabel>Password</FormLabel>
-                  <Input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Min 8 characters"
-                  />
-                  <Text fontSize="xs" color="gray.500" mt={1}>
-                    User will use this to login
-                  </Text>
-                </FormControl>
-              )}
-
-              <FormControl isRequired>
-                <FormLabel>Role</FormLabel>
-                <Select
-                  value={role}
-                  onChange={(e) => setRole(e.target.value as UserRole)}
-                >
-                  <option value="staff">Staff</option>
-                  <option value="director">Director</option>
-                  <option value="hr">HR</option>
-                  <option value="admin">Admin</option>
-                </Select>
-              </FormControl>
-
-              <FormControl isRequired>
-                <FormLabel>Department</FormLabel>
-                <Select
-                  value={departmentId}
-                  onChange={(e) => setDepartmentId(e.target.value)}
-                  placeholder="Select department"
-                >
-                  {departments?.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name} ({dept.code})
-                    </option>
-                  ))}
-                </Select>
-              </FormControl>
-
-              {!user && (
-                <FormControl isRequired>
-                  <FormLabel>Hire Date</FormLabel>
-                  <Input
-                    type="date"
-                    value={hireDate}
-                    onChange={(e) => setHireDate(e.target.value)}
-                  />
-                  <Text fontSize="xs" color="gray.500" mt={1}>
-                    Leave allocation will be pro-rated based on hire date
-                  </Text>
-                </FormControl>
-              )}
-            </VStack>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onClose}>
-              Cancel
-            </Button>
-            <Button colorScheme="blue" type="submit" isLoading={isSubmitting}>
-              {user ? "Update User" : "Create User"}
-            </Button>
-          </ModalFooter>
-        </form>
-      </ModalContent>
-    </Modal>
-  );
-}
-
-// ============================================
-// STATISTICS COMPONENT
-// ============================================
-
-function UserStatistics() {
-  const { data: stats, isLoading } = useQuery({
-    queryKey: ["user-statistics"],
-    queryFn: getUserStatistics,
-  });
-
-  if (isLoading) {
-    return (
-      <Box textAlign="center" py={4}>
-        <Spinner />
-      </Box>
-    );
-  }
-
-  const roleColors: Record<UserRole, string> = {
-    staff: "blue",
-    director: "purple",
-    hr: "green",
-    admin: "red",
+      if (error) throw error;
+      setDepartments(data || []);
+    } catch (error: any) {
+      console.error("Error fetching departments:", error);
+    }
   };
 
-  return (
-    <Grid templateColumns="repeat(auto-fit, minmax(200px, 1fr))" gap={4} mb={6}>
-      <Card>
-        <CardBody>
-          <Stat>
-            <StatLabel>Total Users</StatLabel>
-            <StatNumber>{stats?.total_users || 0}</StatNumber>
-          </Stat>
-        </CardBody>
-      </Card>
+  useEffect(() => {
+    fetchUsers();
+    fetchDepartments();
 
-      <Card>
-        <CardBody>
-          <Stat>
-            <StatLabel>Active Users</StatLabel>
-            <StatNumber color="green.500">
-              {stats?.active_users || 0}
-            </StatNumber>
-          </Stat>
-        </CardBody>
-      </Card>
+    // Auto-refresh every 5 seconds
+    const interval = setInterval(fetchUsers, 5000);
+    return () => clearInterval(interval);
+  }, []);
 
-      {stats?.by_role.map((item) => (
-        <Card key={item.role}>
-          <CardBody>
-            <Stat>
-              <StatLabel>
-                <Badge colorScheme={roleColors[item.role]}>
-                  {item.role.toUpperCase()}
-                </Badge>
-              </StatLabel>
-              <StatNumber>{item.count}</StatNumber>
-            </Stat>
-          </CardBody>
-        </Card>
-      ))}
-    </Grid>
-  );
-}
+  // ============================================
+  // CREATE USER
+  // ============================================
 
-// ============================================
-// MAIN USER MANAGEMENT COMPONENT
-// ============================================
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-export function UserManagement() {
-  const { isOpen, onOpen, onClose } = useDisclosure();
-  const [selectedUser, setSelectedUser] = useState<any>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [filters, setFilters] = useState<UserFilters>({
-    page: 1,
-    limit: 20,
-  });
-  const cancelRef = React.useRef<HTMLButtonElement>(null!);
-  const toast = useToast();
-  const queryClient = useQueryClient();
-
-  // Fetch users
-  const {
-    data: usersData,
-    isLoading,
-    refetch,
-  } = useQuery({
-    queryKey: ["users", filters],
-    queryFn: () => getUsers(filters),
-  });
-
-  // Fetch departments for filter
-  const { data: departments } = useQuery({
-    queryKey: ["departments"],
-    queryFn: getDepartments,
-  });
-
-  // Delete mutation
-  const deleteMutation = useMutation({
-    mutationFn: deleteUser,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["user-statistics"] });
+    // Validation
+    if (!formData.email || !formData.full_name || !formData.password) {
       toast({
-        title: "User deactivated",
-        description: "User has been deactivated successfully",
+        title: "Missing required fields",
+        description: "Email, name, and password are required",
+        status: "warning",
+        duration: 3000,
+      });
+      return;
+    }
+
+    if (formData.password.length < 6) {
+      toast({
+        title: "Password too short",
+        description: "Password must be at least 6 characters",
+        status: "warning",
+        duration: 3000,
+      });
+      return;
+    }
+
+    try {
+      console.log("Step 1: Creating auth user...");
+
+      // Step 1: Create authentication user
+      const { data: authData, error: authError } = await supabase.auth.signUp({
+        email: formData.email,
+        password: formData.password,
+        options: {
+          emailRedirectTo: undefined, // Prevent email confirmation
+        },
+      });
+
+      if (authError) {
+        console.error("Auth error:", authError);
+        throw new Error(`Authentication error: ${authError.message}`);
+      }
+
+      if (!authData.user) {
+        throw new Error("No user returned from signup");
+      }
+
+      const userId = authData.user.id;
+      console.log("Auth user created with ID:", userId);
+
+      // Step 2: Insert user profile into database
+      console.log("Step 2: Creating database profile...");
+
+      const { error: dbError } = await supabase.from("users").insert([
+        {
+          id: userId,
+          email: formData.email,
+          full_name: formData.full_name,
+          role: formData.role,
+          department_id: formData.department_id || null,
+          hire_date: formData.hire_date,
+          is_active: true,
+        },
+      ]);
+
+      if (dbError) {
+        console.error("Database error:", dbError);
+        throw new Error(`Database error: ${dbError.message}`);
+      }
+
+      console.log("User profile created successfully");
+
+      // Step 3: Allocate leave balances
+      console.log("Step 3: Allocating leave balances...");
+
+      try {
+        const { error: allocateError } = await supabase.rpc(
+          "allocate_leave_for_user",
+          {
+            p_user_id: userId,
+            p_year: new Date().getFullYear(),
+          }
+        );
+
+        if (allocateError) {
+          console.warn("Leave allocation warning:", allocateError);
+        } else {
+          console.log("Leave balances allocated");
+        }
+      } catch (allocError) {
+        console.warn("Non-critical: Failed to allocate leave", allocError);
+      }
+
+      // Success!
+      toast({
+        title: "✅ User created successfully",
+        description: `${formData.full_name} has been added`,
+        status: "success",
+        duration: 4000,
+      });
+
+      // Reset form and close modal
+      setFormData({
+        email: "",
+        full_name: "",
+        password: "",
+        role: "staff",
+        department_id: "",
+        hire_date: new Date().toISOString().split("T")[0],
+      });
+      setShowCreateModal(false);
+
+      // Refresh user list
+      fetchUsers();
+    } catch (error: any) {
+      console.error("Create user error:", error);
+      toast({
+        title: "❌ Failed to create user",
+        description: error.message || "Unknown error occurred",
+        status: "error",
+        duration: 6000,
+      });
+    }
+  };
+
+  // ============================================
+  // UPDATE USER
+  // ============================================
+
+  const handleUpdateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!selectedUser) return;
+
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({
+          full_name: formData.full_name,
+          role: formData.role,
+          department_id: formData.department_id || null,
+          hire_date: formData.hire_date,
+        })
+        .eq("id", selectedUser.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "✅ User updated",
         status: "success",
         duration: 3000,
       });
-      setDeleteId(null);
-    },
-    onError: (error: any) => {
+
+      setShowEditModal(false);
+      setSelectedUser(null);
+      fetchUsers();
+    } catch (error: any) {
       toast({
-        title: "Error",
+        title: "❌ Update failed",
         description: error.message,
         status: "error",
         duration: 5000,
       });
-    },
-  });
-
-  // Activate mutation
-  const activateMutation = useMutation({
-    mutationFn: activateUser,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["user-statistics"] });
-      toast({
-        title: "User activated",
-        status: "success",
-        duration: 3000,
-      });
-    },
-  });
-
-  // Deactivate mutation
-  const deactivateMutation = useMutation({
-    mutationFn: deactivateUser,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["users"] });
-      queryClient.invalidateQueries({ queryKey: ["user-statistics"] });
-      toast({
-        title: "User deactivated",
-        status: "success",
-        duration: 3000,
-      });
-    },
-  });
-
-  const handleEdit = (user: any) => {
-    setSelectedUser(user);
-    onOpen();
-  };
-
-  const handleCreate = () => {
-    setSelectedUser(null);
-    onOpen();
-  };
-
-  const handleCloseForm = () => {
-    setSelectedUser(null);
-    onClose();
-  };
-
-  const handleFormSuccess = () => {
-    refetch();
-    queryClient.invalidateQueries({ queryKey: ["user-statistics"] });
-  };
-
-  const handleToggleActive = async (user: any) => {
-    if (user.is_active) {
-      await deactivateMutation.mutateAsync(user.id);
-    } else {
-      await activateMutation.mutateAsync(user.id);
     }
   };
 
-  const roleColors: Record<UserRole, string> = {
-    staff: "blue",
-    director: "purple",
-    hr: "green",
-    admin: "red",
+  // ============================================
+  // DELETE USER
+  // ============================================
+
+  const handleDeleteUser = async (user: User) => {
+    if (!window.confirm(`Delete ${user.full_name}? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase.from("users").delete().eq("id", user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: "✅ User deleted",
+        status: "success",
+        duration: 3000,
+      });
+
+      fetchUsers();
+    } catch (error: any) {
+      toast({
+        title: "❌ Delete failed",
+        description: error.message,
+        status: "error",
+        duration: 5000,
+      });
+    }
   };
 
+  // ============================================
+  // TOGGLE ACTIVE STATUS
+  // ============================================
+
+  const handleToggleActive = async (user: User) => {
+    try {
+      const { error } = await supabase
+        .from("users")
+        .update({ is_active: !user.is_active })
+        .eq("id", user.id);
+
+      if (error) throw error;
+
+      toast({
+        title: `User ${user.is_active ? "deactivated" : "activated"}`,
+        status: "success",
+        duration: 2000,
+      });
+
+      fetchUsers();
+    } catch (error: any) {
+      toast({
+        title: "Failed to update status",
+        description: error.message,
+        status: "error",
+        duration: 4000,
+      });
+    }
+  };
+
+  // ============================================
+  // HELPERS
+  // ============================================
+
+  const getRoleBadgeColor = (role: UserRole) => {
+    switch (role) {
+      case "admin":
+        return "purple";
+      case "hr":
+        return "blue";
+      case "director":
+        return "green";
+      default:
+        return "gray";
+    }
+  };
+
+  const getDepartmentName = (deptId: string | null) => {
+    if (!deptId) return "-";
+    const dept = departments.find((d) => d.id === deptId);
+    return dept ? `${dept.name} (${dept.code})` : "-";
+  };
+
+  const openEditModal = (user: User) => {
+    setSelectedUser(user);
+    setFormData({
+      email: user.email,
+      full_name: user.full_name,
+      password: "",
+      role: user.role,
+      department_id: user.department_id || "",
+      hire_date: user.hire_date,
+    });
+    setShowEditModal(true);
+  };
+
+  // ============================================
+  // RENDER
+  // ============================================
+
   return (
-    <VStack spacing={6} align="stretch">
-      {/* Statistics */}
-      <UserStatistics />
-
-      {/* Filters and Create Button */}
-      <Card>
-        <CardBody>
-          <HStack spacing={4} wrap="wrap" justify="space-between">
-            <HStack spacing={4} wrap="wrap">
-              <FormControl maxW="200px">
-                <FormLabel fontSize="sm">Search</FormLabel>
-                <Input
-                  size="sm"
-                  placeholder="Name or email..."
-                  value={filters.search || ""}
-                  onChange={(e) =>
-                    setFilters({ ...filters, search: e.target.value, page: 1 })
-                  }
-                />
-              </FormControl>
-
-              <FormControl maxW="150px">
-                <FormLabel fontSize="sm">Role</FormLabel>
-                <Select
-                  size="sm"
-                  value={filters.role || ""}
-                  onChange={(e) =>
-                    setFilters({
-                      ...filters,
-                      role: e.target.value as UserRole | undefined,
-                      page: 1,
-                    })
-                  }
-                >
-                  <option value="">All Roles</option>
-                  <option value="staff">Staff</option>
-                  <option value="director">Director</option>
-                  <option value="hr">HR</option>
-                  <option value="admin">Admin</option>
-                </Select>
-              </FormControl>
-
-              <FormControl maxW="200px">
-                <FormLabel fontSize="sm">Department</FormLabel>
-                <Select
-                  size="sm"
-                  value={filters.department_id || ""}
-                  onChange={(e) =>
-                    setFilters({
-                      ...filters,
-                      department_id: e.target.value,
-                      page: 1,
-                    })
-                  }
-                >
-                  <option value="">All Departments</option>
-                  {departments?.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.name}
-                    </option>
-                  ))}
-                </Select>
-              </FormControl>
-
-              <FormControl maxW="150px">
-                <FormLabel fontSize="sm">Status</FormLabel>
-                <Select
-                  size="sm"
-                  value={
-                    filters.is_active === undefined
-                      ? ""
-                      : String(filters.is_active)
-                  }
-                  onChange={(e) =>
-                    setFilters({
-                      ...filters,
-                      is_active:
-                        e.target.value === ""
-                          ? undefined
-                          : e.target.value === "true",
-                      page: 1,
-                    })
-                  }
-                >
-                  <option value="">All</option>
-                  <option value="true">Active</option>
-                  <option value="false">Inactive</option>
-                </Select>
-              </FormControl>
-            </HStack>
-
-            <Button colorScheme="blue" onClick={handleCreate}>
-              ➕ Create User
+    <Card>
+      <CardHeader>
+        <HStack justify="space-between">
+          <Heading size="md">👥 User Management</Heading>
+          <HStack>
+            <Button
+              leftIcon={<AddIcon />}
+              colorScheme="blue"
+              onClick={() => setShowCreateModal(true)}
+            >
+              Create User
             </Button>
           </HStack>
-        </CardBody>
-      </Card>
+        </HStack>
+      </CardHeader>
 
-      {/* Users Table */}
-      <Card>
-        <CardHeader>
-          <HStack justify="space-between">
-            <Heading size="md">Users</Heading>
-            {usersData && (
-              <Text fontSize="sm" color="gray.600">
-                Showing {usersData.data.length} of {usersData.pagination.total}{" "}
-                users
-              </Text>
-            )}
-          </HStack>
-        </CardHeader>
-        <CardBody>
-          {isLoading ? (
-            <Box textAlign="center" py={10}>
-              <Spinner size="xl" />
-              <Text mt={4}>Loading users...</Text>
-            </Box>
-          ) : usersData && usersData.data.length > 0 ? (
-            <>
-              <Box overflowX="auto">
-                <Table variant="simple">
-                  <Thead>
-                    <Tr>
-                      <Th>Name</Th>
-                      <Th>Email</Th>
-                      <Th>Role</Th>
-                      <Th>Department</Th>
-                      <Th>Hire Date</Th>
-                      <Th>Status</Th>
-                      <Th>Actions</Th>
-                    </Tr>
-                  </Thead>
-                  <Tbody>
-                    {usersData.data.map((user) => (
-                      <Tr key={user.id}>
-                        <Td fontWeight="medium">{user.full_name}</Td>
-                        <Td>
-                          <Text fontSize="sm">{user.email}</Text>
-                        </Td>
-                        <Td>
-                          <Badge colorScheme={roleColors[user.role]}>
-                            {user.role.toUpperCase()}
-                          </Badge>
-                        </Td>
-                        <Td>
-                          <Text fontSize="sm">
-                            {user.department?.name || "Unassigned"}
-                          </Text>
-                        </Td>
-                        <Td>
-                          <Text fontSize="sm">
-                            {formatDate(user.hire_date)}
-                          </Text>
-                        </Td>
-                        <Td>
-                          <Tooltip
-                            label={
-                              user.is_active
-                                ? "Click to deactivate"
-                                : "Click to activate"
-                            }
-                          >
-                            <Switch
-                              isChecked={user.is_active}
-                              onChange={() => handleToggleActive(user)}
-                              colorScheme="green"
-                            />
-                          </Tooltip>
-                        </Td>
-                        <Td>
-                          <HStack spacing={2}>
-                            <Button size="sm" onClick={() => handleEdit(user)}>
-                              Edit
-                            </Button>
-                            <Menu>
-                              <MenuButton
-                                as={Button}
-                                size="sm"
-                                variant="outline"
-                              >
-                                ⋮
-                              </MenuButton>
-                              <MenuList>
-                                <MenuItem onClick={() => handleEdit(user)}>
-                                  Edit Profile
-                                </MenuItem>
-                                <MenuItem
-                                  onClick={() =>
-                                    user.is_active
-                                      ? deactivateMutation.mutate(user.id)
-                                      : activateMutation.mutate(user.id)
-                                  }
-                                >
-                                  {user.is_active ? "Deactivate" : "Activate"}
-                                </MenuItem>
-                                <MenuItem
-                                  color="red.500"
-                                  onClick={() => setDeleteId(user.id)}
-                                >
-                                  Delete (Deactivate)
-                                </MenuItem>
-                              </MenuList>
-                            </Menu>
-                          </HStack>
-                        </Td>
-                      </Tr>
-                    ))}
-                  </Tbody>
-                </Table>
-              </Box>
+      <CardBody>
+        {loading ? (
+          <Box textAlign="center" py={10}>
+            <Spinner size="xl" />
+            <Text mt={4}>Loading users...</Text>
+          </Box>
+        ) : users.length === 0 ? (
+          <Box textAlign="center" py={10}>
+            <Text fontSize="lg" color="gray.500" mb={4}>
+              No users found
+            </Text>
+            <Button colorScheme="blue" onClick={() => setShowCreateModal(true)}>
+              Create Your First User
+            </Button>
+          </Box>
+        ) : (
+          <Box overflowX="auto">
+            <Table variant="simple">
+              <Thead>
+                <Tr>
+                  <Th>Name</Th>
+                  <Th>Email</Th>
+                  <Th>Role</Th>
+                  <Th>Department</Th>
+                  <Th>Hire Date</Th>
+                  <Th>Status</Th>
+                  <Th>Actions</Th>
+                </Tr>
+              </Thead>
+              <Tbody>
+                {users.map((user) => (
+                  <Tr key={user.id}>
+                    <Td fontWeight="medium">{user.full_name}</Td>
+                    <Td>{user.email}</Td>
+                    <Td>
+                      <Badge colorScheme={getRoleBadgeColor(user.role)}>
+                        {user.role}
+                      </Badge>
+                    </Td>
+                    <Td>{getDepartmentName(user.department_id)}</Td>
+                    <Td>{new Date(user.hire_date).toLocaleDateString()}</Td>
+                    <Td>
+                      <Badge
+                        colorScheme={user.is_active ? "green" : "red"}
+                        cursor="pointer"
+                        onClick={() => handleToggleActive(user)}
+                      >
+                        {user.is_active ? "Active" : "Inactive"}
+                      </Badge>
+                    </Td>
+                    <Td>
+                      <HStack spacing={2}>
+                        <IconButton
+                          aria-label="Edit user"
+                          icon={<EditIcon />}
+                          size="sm"
+                          onClick={() => openEditModal(user)}
+                        />
+                        <IconButton
+                          aria-label="Delete user"
+                          icon={<DeleteIcon />}
+                          size="sm"
+                          colorScheme="red"
+                          variant="ghost"
+                          onClick={() => handleDeleteUser(user)}
+                        />
+                      </HStack>
+                    </Td>
+                  </Tr>
+                ))}
+              </Tbody>
+            </Table>
+          </Box>
+        )}
+      </CardBody>
 
-              {/* Pagination */}
-              <HStack justify="space-between" mt={4}>
-                <Button
-                  size="sm"
-                  onClick={() =>
-                    setFilters({ ...filters, page: filters.page! - 1 })
-                  }
-                  isDisabled={filters.page === 1}
-                >
-                  Previous
-                </Button>
-                <Text fontSize="sm">
-                  Page {usersData.pagination.page} of{" "}
-                  {usersData.pagination.total_pages}
-                </Text>
-                <Button
-                  size="sm"
-                  onClick={() =>
-                    setFilters({ ...filters, page: filters.page! + 1 })
-                  }
-                  isDisabled={filters.page === usersData.pagination.total_pages}
-                >
-                  Next
-                </Button>
-              </HStack>
-            </>
-          ) : (
-            <Box textAlign="center" py={10}>
-              <Text color="gray.500">
-                No users found. Create one to get started.
-              </Text>
-            </Box>
-          )}
-        </CardBody>
-      </Card>
-
-      {/* Create/Edit Modal */}
-      <UserForm
-        user={selectedUser}
-        isOpen={isOpen}
-        onClose={handleCloseForm}
-        onSuccess={handleFormSuccess}
-      />
-
-      {/* Delete Confirmation */}
-      <AlertDialog
-        isOpen={deleteId !== null}
-        leastDestructiveRef={cancelRef}
-        onClose={() => setDeleteId(null)}
+      {/* CREATE USER MODAL */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={() => setShowCreateModal(false)}
+        size="lg"
       >
-        <AlertDialogOverlay>
-          <AlertDialogContent>
-            <AlertDialogHeader>Deactivate User</AlertDialogHeader>
-            <AlertDialogBody>
-              Are you sure? The user will be deactivated and cannot login.
-            </AlertDialogBody>
-            <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={() => setDeleteId(null)}>
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Create New User</ModalHeader>
+          <ModalCloseButton />
+          <form onSubmit={handleCreateUser}>
+            <ModalBody>
+              <VStack spacing={4}>
+                <FormControl isRequired>
+                  <FormLabel>Email</FormLabel>
+                  <Input
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
+                    placeholder="user@company.com"
+                  />
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel>Full Name</FormLabel>
+                  <Input
+                    value={formData.full_name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, full_name: e.target.value })
+                    }
+                    placeholder="John Doe"
+                  />
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel>Password</FormLabel>
+                  <Input
+                    type="password"
+                    value={formData.password}
+                    onChange={(e) =>
+                      setFormData({ ...formData, password: e.target.value })
+                    }
+                    placeholder="Minimum 6 characters"
+                  />
+                  <Text fontSize="sm" color="gray.500" mt={1}>
+                    Password must be at least 6 characters
+                  </Text>
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel>Role</FormLabel>
+                  <Select
+                    value={formData.role}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        role: e.target.value as UserRole,
+                      })
+                    }
+                  >
+                    <option value="staff">Staff</option>
+                    <option value="director">Director</option>
+                    <option value="hr">HR</option>
+                    <option value="admin">Admin</option>
+                  </Select>
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Department (Optional)</FormLabel>
+                  <Select
+                    value={formData.department_id}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        department_id: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">No Department</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name} ({dept.code})
+                      </option>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel>Hire Date</FormLabel>
+                  <Input
+                    type="date"
+                    value={formData.hire_date}
+                    onChange={(e) =>
+                      setFormData({ ...formData, hire_date: e.target.value })
+                    }
+                  />
+                </FormControl>
+              </VStack>
+            </ModalBody>
+
+            <ModalFooter>
+              <Button
+                variant="ghost"
+                mr={3}
+                onClick={() => setShowCreateModal(false)}
+              >
                 Cancel
               </Button>
-              <Button
-                colorScheme="red"
-                onClick={() => deleteId && deleteMutation.mutate(deleteId)}
-                ml={3}
-                isLoading={deleteMutation.isPending}
-              >
-                Deactivate
+              <Button colorScheme="blue" type="submit">
+                Create User
               </Button>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialogOverlay>
-      </AlertDialog>
-    </VStack>
+            </ModalFooter>
+          </form>
+        </ModalContent>
+      </Modal>
+
+      {/* EDIT USER MODAL */}
+      <Modal
+        isOpen={showEditModal}
+        onClose={() => setShowEditModal(false)}
+        size="lg"
+      >
+        <ModalOverlay />
+        <ModalContent>
+          <ModalHeader>Edit User</ModalHeader>
+          <ModalCloseButton />
+          <form onSubmit={handleUpdateUser}>
+            <ModalBody>
+              <VStack spacing={4}>
+                <FormControl>
+                  <FormLabel>Email</FormLabel>
+                  <Input value={formData.email} isReadOnly bg="gray.50" />
+                  <Text fontSize="sm" color="gray.500" mt={1}>
+                    Email cannot be changed
+                  </Text>
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel>Full Name</FormLabel>
+                  <Input
+                    value={formData.full_name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, full_name: e.target.value })
+                    }
+                  />
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel>Role</FormLabel>
+                  <Select
+                    value={formData.role}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        role: e.target.value as UserRole,
+                      })
+                    }
+                  >
+                    <option value="staff">Staff</option>
+                    <option value="director">Director</option>
+                    <option value="hr">HR</option>
+                    <option value="admin">Admin</option>
+                  </Select>
+                </FormControl>
+
+                <FormControl>
+                  <FormLabel>Department</FormLabel>
+                  <Select
+                    value={formData.department_id}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        department_id: e.target.value,
+                      })
+                    }
+                  >
+                    <option value="">No Department</option>
+                    {departments.map((dept) => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name} ({dept.code})
+                      </option>
+                    ))}
+                  </Select>
+                </FormControl>
+
+                <FormControl isRequired>
+                  <FormLabel>Hire Date</FormLabel>
+                  <Input
+                    type="date"
+                    value={formData.hire_date}
+                    onChange={(e) =>
+                      setFormData({ ...formData, hire_date: e.target.value })
+                    }
+                  />
+                </FormControl>
+              </VStack>
+            </ModalBody>
+
+            <ModalFooter>
+              <Button
+                variant="ghost"
+                mr={3}
+                onClick={() => setShowEditModal(false)}
+              >
+                Cancel
+              </Button>
+              <Button colorScheme="blue" type="submit">
+                Update User
+              </Button>
+            </ModalFooter>
+          </form>
+        </ModalContent>
+      </Modal>
+    </Card>
   );
 }

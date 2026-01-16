@@ -53,8 +53,14 @@ function LoginButton() {
 
   const handleLogin = async () => {
     const { data, error } = await supabase.auth.signInWithPassword({
-      email: "admin@company.com",
-      password: "Admin123!",
+      // email: "test@company.com",
+      // password: "Test123!",
+
+      email: "Director@company.com",
+      password: "Director123!",
+
+      // email: "hr@company.com",
+      // password: "Hr123!",
     });
 
     if (error) {
@@ -74,7 +80,7 @@ function LoginButton() {
       {user ? (
         <VStack align="flex-start" spacing={2}>
           <Text fontWeight="bold">👤 {profile?.full_name || user.email}</Text>
-          <Badge colorScheme="purple">{profile?.role || "User"}</Badge>
+          <Badge colorScheme="purple">{profile?.role}</Badge>
           <Button size="sm" onClick={handleLogout} variant="outline">
             Logout
           </Button>
@@ -82,8 +88,9 @@ function LoginButton() {
       ) : (
         <VStack align="flex-start" spacing={2}>
           <Text>🔒 Not logged in</Text>
+
           <Button size="sm" onClick={handleLogin} colorScheme="blue">
-            Quick Login (Admin)
+            Quick Login
           </Button>
         </VStack>
       )}

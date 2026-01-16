@@ -11,6 +11,8 @@ import type {
   PaginatedResponse,
 } from '@/types/models';
 
+
+
 // ============================================
 // GET LEAVE APPLICATIONS
 // ============================================
@@ -21,6 +23,11 @@ export const getLeaveApplications = async (params?: {
   status?: LeaveStatus | LeaveStatus[];
   leave_type?: LeaveType;
   user_id?: string;
+  // department_id?: String;
+  // start_date?: String;
+  // end_date?: String;
+  // sort_by?: 'submitted_at' | 'start_date' | 'status';
+  // sort_order?: 'asc' | 'desc';
 }): Promise<PaginatedResponse<LeaveApplication>> => {
   const page = params?.page || 1;
   const limit = params?.limit || 20;

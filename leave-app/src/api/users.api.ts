@@ -142,11 +142,12 @@ export async function getUserById(id: string): Promise<User> {
 
 /**
  * Create new user (Admin only)
- * This creates both auth user and database profile
  */
 export async function createUser(params: CreateUserParams): Promise<User> {
   try {
     const { email, password, full_name, role, department_id, hire_date } = params;
+
+    console.log('Creating user:', { email, full_name, role, department_id, hire_date });
 
     // 1. Create auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -159,13 +160,21 @@ export async function createUser(params: CreateUserParams): Promise<User> {
       },
     });
 
-    if (authError) throw authError;
-    if (!authData.user) throw new Error('Failed to create auth user');
+    if (authError) {
+      console.error('Auth error:', authError);
+      throw authError;
+    }
+    
+    if (!authData.user) {
+      throw new Error('Failed to create auth user');
+    }
 
-    // 2. Wait a bit for the trigger to create the user record
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('Auth user created:', authData.user.id);
 
-    // 3. Update the user profile in database
+    // 2. Wait for trigger to create user record
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    // 3. Update the user profile with admin-specified details
     const { data: userData, error: userError } = await supabase
       .from('users')
       .update({
@@ -184,15 +193,69 @@ export async function createUser(params: CreateUserParams): Promise<User> {
       )
       .single();
 
-    if (userError) throw userError;
+    if (userError) {
+      console.error('User update error:', userError);
+      
+      // If user doesn't exist in users table, create it manually
+      if (userError.code === 'PGRST116') {
+        console.log('User not found in database, creating manually...');
+        
+        const { data: insertedUser, error: insertError } = await supabase
+          .from('users')
+          .insert({
+            id: authData.user.id,
+            email,
+            full_name,
+            role,
+            department_id,
+            hire_date,
+            is_active: true,
+          })
+          .select(
+            `
+            *,
+            department:departments(id, name, code)
+          `
+          )
+          .single();
 
-    // 4. Allocate leave balances for the new user
-    await supabase.rpc('allocate_leave_for_user', {
+        if (insertError) {
+          console.error('Insert error:', insertError);
+          throw insertError;
+        }
+
+        // 4. Allocate leave balances
+        console.log('Allocating leave for user:', authData.user.id);
+        const { error: allocError } = await supabase.rpc('allocate_leave_for_user', {
+          p_user_id: authData.user.id,
+          p_year: new Date().getFullYear(),
+          p_hire_date: hire_date,
+        });
+
+        if (allocError) {
+          console.error('Leave allocation error:', allocError);
+        }
+
+        return insertedUser;
+      }
+      
+      throw userError;
+    }
+
+    // 4. Allocate leave balances
+    console.log('Allocating leave for user:', authData.user.id);
+    const { error: allocError } = await supabase.rpc('allocate_leave_for_user', {
       p_user_id: authData.user.id,
       p_year: new Date().getFullYear(),
       p_hire_date: hire_date,
     });
 
+    if (allocError) {
+      console.error('Leave allocation error:', allocError);
+      // Don't throw - user is created, just allocation failed
+    }
+
+    console.log('User created successfully:', userData);
     return userData;
   } catch (error: any) {
     console.error('Error creating user:', error);
