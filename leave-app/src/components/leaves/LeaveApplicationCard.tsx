@@ -75,9 +75,23 @@ export function LeaveApplicationCard({
 
   // Calculate resumption date (day after end_date)
   const getResumptionDate = () => {
-    const endDate = new Date(application.end_date);
-    endDate.setDate(endDate.getDate() + 1);
-    return endDate.toISOString().split("T")[0];
+    // We create the starting point from the application end_date
+    const resumptionDate = new Date(application.end_date);
+
+    // We want the NEXT business day, so we start by adding one day
+    let daysToAdd = 1;
+
+    while (daysToAdd > 0) {
+      resumptionDate.setDate(resumptionDate.getDate() + 1);
+      const dayOfWeek = resumptionDate.getDay();
+
+      // 0 = Sunday, 6 = Saturday
+      // Only "consume" the daysToAdd if it's a weekday
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        daysToAdd--;
+      }
+    }
+    return resumptionDate.toISOString().split("T")[0];
   };
 
   // Get user name - try multiple data structures
@@ -86,14 +100,14 @@ export function LeaveApplicationCard({
     console.log("User data:", application.user);
     console.log(
       "Full application object:",
-      JSON.stringify(application, null, 2)
+      JSON.stringify(application, null, 2),
     );
 
     // Try all possible locations
     if (application.user?.full_name) {
       console.log(
         "Found name in application.user.full_name:",
-        application.user.full_name
+        application.user.full_name,
       );
       return application.user.full_name;
     }
@@ -103,7 +117,7 @@ export function LeaveApplicationCard({
     if (appAny.user?.full_name) {
       console.log(
         "Found name in appAny.user.full_name:",
-        appAny.user.full_name
+        appAny.user.full_name,
       );
       return appAny.user.full_name;
     }
@@ -111,7 +125,7 @@ export function LeaveApplicationCard({
     if (appAny.users?.full_name) {
       console.log(
         "Found name in appAny.users.full_name:",
-        appAny.users.full_name
+        appAny.users.full_name,
       );
       return appAny.users.full_name;
     }

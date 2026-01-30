@@ -210,67 +210,42 @@ export async function createLeaveApplication(params: {
   leave_type: LeaveType;
   start_date: string;
   end_date: string;
+  working_days: number;
   reason: string;
 }): Promise<LeaveApplication> {
   try {
-    console.log('Creating leave application:', params);
+    const { data: { user: authUser } } = await supabase.auth.getUser();
+    if (!authUser) throw new Error('Not authenticated');
 
-    // Get current user
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      throw new Error('Not authenticated');
-    }
-
-    // Get user's role to determine workflow
+    // 1. Get user role to determine the starting status
     const { data: userProfile } = await supabase
       .from('users')
       .select('role')
-      .eq('id', user.id)
+      .eq('id', authUser.id)
       .single();
 
-    // Calculate working days
-    const { data: workingDaysData, error: calcError } = await supabase.rpc(
-      'calculate_working_days',
-      {
-        p_start_date: params.start_date,
-        p_end_date: params.end_date,
-      }
-    );
-
-    if (calcError) {
-      console.error('Error calculating working days:', calcError);
-      throw new Error('Failed to calculate working days');
-    }
-
-    const working_days = workingDaysData || 0;
-    console.log('Calculated working days:', working_days);
-
-    // Determine initial status based on role
+    // 2. Map status to your DB Enum (pending_director or pending_hr)
     let initialStatus: 'pending_director' | 'pending_hr' = 'pending_director';
     if (userProfile?.role === 'director') {
-      initialStatus = 'pending_hr'; // Director skips director approval
+      initialStatus = 'pending_hr';
     }
 
-    // Insert leave application
+    // 3. Perform the Insert with the literal selection string
     const { data, error } = await supabase
       .from('leave_applications')
       .insert([
         {
-          user_id: user.id,
+          user_id: authUser.id,
           leave_type: params.leave_type,
           start_date: params.start_date,
           end_date: params.end_date,
-          working_days,
+          working_days: params.working_days,
           reason: params.reason,
           status: initialStatus,
           submitted_at: new Date().toISOString(),
         },
       ])
-      .select(
-        `
+      .select(`
         *,
         user:users!leave_applications_user_id_fkey (
           id,
@@ -283,19 +258,17 @@ export async function createLeaveApplication(params: {
             code
           )
         )
-        `
-      )
+      `)
       .single();
 
     if (error) {
-      console.error('Error creating leave application:', error);
+      console.error('Database Error:', error);
       throw error;
     }
 
-    console.log('Leave application created:', data);
     return data;
   } catch (error: any) {
-    console.error('Error in createLeaveApplication:', error);
+    console.error('Create Application Error:', error.message);
     throw new Error(error.message || 'Failed to create leave application');
   }
 }

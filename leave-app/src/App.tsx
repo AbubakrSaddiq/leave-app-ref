@@ -56,7 +56,13 @@ function LoginButton() {
       // email: "test3@company.com",
       // password: "Test123!",
 
-      // email: "Director.finance@company.com",
+      email: "staff.rld@company.com",
+      password: "Test123!",
+
+      // email: "test.research.lab@company.com",
+      // password: "Test123!",
+
+      // email: "Director.rld@company.com",
       // password: "Director123!",
 
       // email: "hr@company.com",
@@ -68,8 +74,14 @@ function LoginButton() {
       // email: "admin@company.com",
       // password: "Admin123!",
 
-      email: "testfinance@company.com",
-      password: "Test123!",
+      // email: "sharon.may@company.com",
+      // password: "Test123!",
+
+      //   email: "director.budget@company.com",
+      // password: "Director123!",
+
+      // email: "testfinance@company.com",
+      // password: "Test123!",
     });
 
     if (error) {
@@ -110,6 +122,7 @@ function LoginButton() {
 function DashboardTabs({ role }: { role: string }) {
   const isDirector = role === "director";
   const isHR = role === "hr";
+  const isStaff = role === "staff";
   const isAdmin = role === "admin";
   const canViewAnalytics = isDirector || isHR || isAdmin;
   const canManageSystem = isAdmin;
@@ -120,9 +133,9 @@ function DashboardTabs({ role }: { role: string }) {
         <Tab>📊 My Balances</Tab>
         <Tab>✍️ Apply for Leave</Tab>
         <Tab>📋 My Applications</Tab>
-        {(isDirector || isAdmin) && <Tab>✅ Director Approvals</Tab>}
-        {(isHR || isAdmin) && <Tab>✅ HR Approvals</Tab>}
-        {canViewAnalytics && <Tab>📈 Analytics</Tab>}
+        {isDirector && <Tab>✅ Director Approvals</Tab>}
+        {isHR && <Tab>✅ HR Approvals</Tab>}
+        {/* {canViewAnalytics && <Tab>📈 Analytics</Tab>} */}
         {canManageSystem && <Tab>👥 Users</Tab>}
         {canManageSystem && <Tab>🏢 Departments</Tab>}
       </TabList>
@@ -140,23 +153,23 @@ function DashboardTabs({ role }: { role: string }) {
           <MyLeaveApplications />
         </TabPanel>
 
-        {(isDirector || isAdmin) && (
+        {isDirector && (
           <TabPanel>
             <ApprovalQueue role="director" />
           </TabPanel>
         )}
 
-        {(isHR || isAdmin) && (
+        {isHR && (
           <TabPanel>
             <ApprovalQueue role="hr" />
           </TabPanel>
         )}
 
-        {canViewAnalytics && (
+        {/* {canViewAnalytics && (
           <TabPanel>
             <AnalyticsDashboard />
           </TabPanel>
-        )}
+        )} */}
 
         {canManageSystem && (
           <TabPanel>
@@ -199,10 +212,17 @@ function App() {
     <ChakraProvider>
       <QueryClientProvider client={queryClient}>
         <Container maxW="container.xl" py={8}>
-          <Heading mb={2}>🏢 Leave Management System</Heading>
-          <Text mb={6} color="gray.600">
+          {/* <Image
+            src="/src/assets/logo/naseni_logo_3.png" // Replace with your actual path in the public folder
+            fallbackSrc="https://via.placeholder.com/40" // Shows while loading
+            boxSize="40px"
+            objectFit="contain"
+            alt="Company Logo"
+          /> */}
+          <Heading mb={2}>Leave Management System</Heading>
+          {/* <Text mb={6} color="gray.600">
             Complete Admin Dashboard with User Management ✨
-          </Text>
+          </Text> */}
 
           <LoginButton />
           {profile && <DashboardTabs role={profile.role} />}

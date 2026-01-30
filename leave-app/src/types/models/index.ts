@@ -55,6 +55,12 @@ export interface User {
   created_at: string;
   updated_at: string;
   department?: Department;
+
+    // Relations (populated by queries)
+  // department?: Department;
+  // director?: User;
+  // leave_balances?: LeaveBalance[];
+  // leave_applications?: LeaveApplication[];
 }
 
 export interface Department {

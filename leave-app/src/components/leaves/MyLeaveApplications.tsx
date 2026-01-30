@@ -33,7 +33,6 @@ export function MyLeaveApplications() {
       } = await supabase.auth.getUser();
 
       if (user) {
-        console.log("Current user ID:", user.id);
         setCurrentUserId(user.id);
       } else {
         console.warn("No authenticated user found");
@@ -47,8 +46,6 @@ export function MyLeaveApplications() {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ["my-leave-applications", currentUserId, statusFilter],
     queryFn: () => {
-      console.log("Fetching applications for user:", currentUserId);
-
       return getLeaveApplications({
         user_id: currentUserId!, // CRITICAL: Filter by current user only
         status: statusFilter === "all" ? undefined : statusFilter,

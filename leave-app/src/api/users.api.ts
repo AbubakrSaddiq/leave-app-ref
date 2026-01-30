@@ -35,6 +35,7 @@ export interface CreateUserParams {
   role: UserRole;
   department_id: string;
   hire_date: string;
+
 }
 
 export interface UpdateUserParams {
@@ -42,6 +43,7 @@ export interface UpdateUserParams {
   role?: UserRole;
   department_id?: string;
   is_active?: boolean;
+
 }
 
 // ============================================

@@ -9,4 +9,12 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
+
+  // Completely erase all console logs from the browser
+  esbuild: {
+    // This tells esbuild to remove these specific calls
+    // 'console' removes log, info, warn, error. 
+    // 'debugger' removes debugger statements.
+    // drop: ['console', 'debugger'],
+  },
 })
