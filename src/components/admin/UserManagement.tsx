@@ -1,766 +1,185 @@
-// ============================================
-// USER MANAGEMENT - COMPLETE WITH FIXED EDIT & DELETE
-// File: src/components/admin/UserManagement.tsx
-// ============================================
-
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
-  Box,
-  Button,
-  Table,
-  Thead,
-  Tbody,
-  Tr,
-  Th,
-  Td,
-  Badge,
-  IconButton,
-  useToast,
-  Modal,
-  ModalOverlay,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  ModalCloseButton,
-  FormControl,
-  FormLabel,
-  Input,
-  Select,
-  VStack,
-  HStack,
-  Text,
-  Spinner,
-  Card,
-  CardHeader,
-  CardBody,
-  Heading,
-  AlertDialog,
-  AlertDialogBody,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogContent,
-  AlertDialogOverlay,
-  useDisclosure,
+  Box, Button, Table, Thead, Tbody, Tr, Th, Td, Badge,
+  IconButton, useToast, VStack, HStack, Text, Spinner,
+  Card, CardHeader, CardBody, Heading, useDisclosure,
+  Avatar, Input, InputGroup, InputLeftElement,
+  Menu, MenuButton, MenuList, MenuItem,
+  AlertDialog, AlertDialogOverlay, AlertDialogContent, 
+  AlertDialogHeader, AlertDialogBody, AlertDialogFooter
 } from "@chakra-ui/react";
-import { EditIcon, DeleteIcon, AddIcon } from "@chakra-ui/icons";
+import { FiPlus, FiSearch, FiEdit2, FiTrash2, FiMoreVertical, FiPower } from "react-icons/fi";
 import { supabase } from "@/lib/supabase";
-
-// ============================================
-// TYPES
-// ============================================
-
-type UserRole = "staff" | "director" | "hr" | "admin";
-
-interface User {
-  id: string;
-  email: string;
-  full_name: string;
-  role: UserRole;
-  department_id: string | null;
-  hire_date: string;
-  is_active: boolean;
-  created_at: string;
-}
-
-interface Department {
-  id: string;
-  name: string;
-  code: string;
-}
-
-// ============================================
-// DELETE CONFIRMATION DIALOG
-// ============================================
-
-interface DeleteConfirmDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onConfirm: () => void;
-  userName: string;
-  isDeleting: boolean;
-}
-
-function DeleteConfirmDialog({
-  isOpen,
-  onClose,
-  onConfirm,
-  userName,
-  isDeleting,
-}: DeleteConfirmDialogProps) {
-  const cancelRef = React.useRef<HTMLButtonElement>(null);
-
-  return (
-    <AlertDialog
-      isOpen={isOpen}
-      leastDestructiveRef={cancelRef}
-      onClose={onClose}
-    >
-      <AlertDialogOverlay>
-        <AlertDialogContent>
-          <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            Delete User
-          </AlertDialogHeader>
-
-          <AlertDialogBody>
-            <VStack spacing={3} align="start">
-              <Text>
-                Are you sure you want to delete{" "}
-                <Text as="span" fontWeight="bold" color="red.600">
-                  {userName}
-                </Text>
-                ?
-              </Text>
-              <Box
-                bg="red.50"
-                p={3}
-                borderRadius="md"
-                borderLeft="4px solid"
-                borderLeftColor="red.500"
-              >
-                <Text fontSize="sm" color="red.800">
-                  ⚠️ This action cannot be undone. All leave applications and
-                  balances for this user will be deleted.
-                </Text>
-              </Box>
-            </VStack>
-          </AlertDialogBody>
-
-          <AlertDialogFooter>
-            <Button ref={cancelRef} onClick={onClose} isDisabled={isDeleting}>
-              Cancel
-            </Button>
-            <Button
-              colorScheme="red"
-              onClick={onConfirm}
-              ml={3}
-              isLoading={isDeleting}
-              loadingText="Deleting..."
-            >
-              Delete User
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialogOverlay>
-    </AlertDialog>
-  );
-}
-
-// ============================================
-// USER MANAGEMENT COMPONENT
-// ============================================
+import { UserForm } from "./UserForm";
 
 export function UserManagement() {
   const toast = useToast();
-  const [users, setUsers] = useState<User[]>([]);
-  const [departments, setDepartments] = useState<Department[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEditModal, setShowEditModal] = useState(false);
-  const [selectedUser, setSelectedUser] = useState<User | null>(null);
-  const [userToDelete, setUserToDelete] = useState<User | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-
-  const {
-    isOpen: isDeleteDialogOpen,
-    onOpen: onDeleteDialogOpen,
-    onClose: onDeleteDialogClose,
-  } = useDisclosure();
-
-  // Form state
-  const [formData, setFormData] = useState({
-    email: "",
-    full_name: "",
-    password: "",
-    role: "staff" as UserRole,
-    department_id: "",
-    hire_date: new Date().toISOString().split("T")[0],
-  });
-
-  // ============================================
-  // FETCH DATA
-  // ============================================
+  const [searchQuery, setSearchQuery] = useState("");
+  
+  // Modal Controls
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [userToDelete, setUserToDelete] = useState<any>(null);
+  const cancelRef = useRef<any>(null);
 
   const fetchUsers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("users")
-        .select("*")
-        .order("created_at", { ascending: false });
-
-      if (error) throw error;
-
-      console.log("Fetched users:", data);
-      setUsers(data || []);
-    } catch (error: any) {
-      console.error("Error fetching users:", error);
-      toast({
-        title: "Error loading users",
-        description: error.message,
-        status: "error",
-        duration: 5000,
-      });
-    } finally {
-      setLoading(false);
-    }
+    const { data, error } = await supabase
+      .from("users")
+      .select("*")
+      .order("full_name", { ascending: true });
+    if (!error) setUsers(data || []);
+    setLoading(false);
   };
 
   const fetchDepartments = async () => {
-    try {
-      const { data, error } = await supabase
-        .from("departments")
-        .select("id, name, code")
-        .order("name");
-
-      if (error) throw error;
-      setDepartments(data || []);
-    } catch (error: any) {
-      console.error("Error fetching departments:", error);
-    }
+    const { data } = await supabase.from("departments").select("id, name, code");
+    if (data) setDepartments(data);
   };
 
   useEffect(() => {
     fetchUsers();
     fetchDepartments();
-
-    // Auto-refresh every 10 seconds
-    const interval = setInterval(fetchUsers, 10000);
-    return () => clearInterval(interval);
   }, []);
 
-  // ============================================
-  // CREATE USER
-  // ============================================
-
-  const handleCreateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-
+  const handleDelete = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke(
-        "admin-create-user",
-        {
-          body: {
-            email: formData.email,
-            password: formData.password,
-            user_metadata: {
-              full_name: formData.full_name,
-              role: formData.role,
-              department_id: formData.department_id,
-              hire_date: formData.hire_date,
-            },
-          },
-        },
-      );
-
+      const { error } = await supabase.from("users").delete().eq("id", userToDelete.id);
       if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "User created and confirmed automatically.",
-        status: "success",
-      });
-
-      setShowCreateModal(false);
+      toast({ title: "User deleted", status: "success" });
       fetchUsers();
     } catch (err: any) {
-      toast({
-        title: "Error",
-        description: err.message || "Failed to call edge function",
-        status: "error",
-      });
+      toast({ title: "Error", description: err.message, status: "error" });
     } finally {
-      setLoading(false);
-    }
-  };
-
-  // ============================================
-  // UPDATE USER
-  // ============================================
-
-  const handleUpdateUser = async (e: React.FormEvent) => {
-    e.preventDefault();
-
-    if (!selectedUser) return;
-    setLoading(true);
-    try {
-      const { error } = await supabase
-        .from("users")
-        .update({
-          full_name: formData.full_name,
-          role: formData.role,
-          department_id: formData.department_id || null,
-          hire_date: formData.hire_date,
-        })
-        .eq("id", selectedUser.id);
-
-      if (error) {
-        console.error("Update error:", error);
-        throw error;
-      }
-
-      toast({
-        title: "✅ User updated successfully",
-        description: `${formData.full_name} has been updated`,
-        status: "success",
-        duration: 3000,
-      });
-
-      setShowEditModal(false);
-      setSelectedUser(null);
-      fetchUsers();
-    } catch (error: any) {
-      toast({
-        title: "❌ Update failed",
-        description: error.message,
-        status: "error",
-        duration: 5000,
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // ============================================
-  // DELETE USER
-  // ============================================
-
-  const handleDeleteClick = (user: User) => {
-    setUserToDelete(user);
-    onDeleteDialogOpen();
-  };
-
-  const handleDeleteConfirm = async () => {
-    if (!userToDelete) return;
-
-    setIsDeleting(true);
-
-    try {
-      // console.log("Deleting user:", userToDelete.id);
-
-      // Delete from database (cascades to related records)
-      const { error: dbError } = await supabase
-        .from("users")
-        .delete()
-        .eq("id", userToDelete.id);
-
-      if (dbError) {
-        console.error("Database delete error:", dbError);
-        throw dbError;
-      }
-
-      toast({
-        title: "✅ User deleted",
-        description: `${userToDelete.full_name} has been removed`,
-        status: "success",
-        duration: 3000,
-      });
-
-      onDeleteDialogClose();
       setUserToDelete(null);
-      fetchUsers();
-    } catch (error: any) {
-      console.error("Delete user error:", error);
-      toast({
-        title: "❌ Delete failed",
-        description: error.message,
-        status: "error",
-        duration: 5000,
-      });
-    } finally {
-      setIsDeleting(false);
     }
   };
 
-  // ============================================
-  // TOGGLE ACTIVE STATUS
-  // ============================================
-
-  const handleToggleActive = async (user: User) => {
-    try {
-      const { error } = await supabase
-        .from("users")
-        .update({ is_active: !user.is_active })
-        .eq("id", user.id);
-
-      if (error) throw error;
-
-      toast({
-        title: `✅ User ${user.is_active ? "deactivated" : "activated"}`,
-        status: "success",
-        duration: 2000,
-      });
-
-      fetchUsers();
-    } catch (error: any) {
-      toast({
-        title: "Failed to update status",
-        description: error.message,
-        status: "error",
-        duration: 4000,
-      });
-    }
+  const handleToggleStatus = async (user: any) => {
+    const { error } = await supabase
+      .from("users")
+      .update({ is_active: !user.is_active })
+      .eq("id", user.id);
+    if (!error) fetchUsers();
   };
 
-  // ============================================
-  // HELPERS
-  // ============================================
-
-  const getRoleBadgeColor = (role: UserRole) => {
-    switch (role) {
-      case "admin":
-        return "purple";
-      case "hr":
-        return "blue";
-      case "director":
-        return "green";
-      default:
-        return "gray";
-    }
-  };
-
-  const getDepartmentName = (deptId: string | null) => {
-    if (!deptId) return "-";
-    const dept = departments.find((d) => d.id === deptId);
-    return dept ? `${dept.name} (${dept.code})` : "-";
-  };
-
-  const openEditModal = (user: User) => {
-    setSelectedUser(user);
-    setFormData({
-      email: user.email,
-      full_name: user.full_name,
-      password: "",
-      role: user.role,
-      department_id: user.department_id || "",
-      hire_date: user.hire_date,
-    });
-    setShowEditModal(true);
-  };
-
-  // ============================================
-  // RENDER
-  // ============================================
+  const filteredUsers = users.filter(u => 
+    u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    u.email.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
-    <Card>
-      <CardHeader>
-        <HStack justify="space-between">
-          <Heading size="md">👥 User Management</Heading>
-          <HStack>
-            <Button
-              leftIcon={<AddIcon />}
-              colorScheme="blue"
-              onClick={() => setShowCreateModal(true)}
-            >
-              Create User
+    <VStack align="stretch" spacing={6}>
+      <Card borderRadius="xl" shadow="sm" border="1px solid" borderColor="gray.100">
+        <CardHeader borderBottomWidth="1px">
+          <HStack justify="space-between">
+            <VStack align="start" spacing={0}>
+              <Heading size="md">Staff Directory</Heading>
+              <Text fontSize="xs" color="gray.500">Manage account access and departmental assignments</Text>
+            </VStack>
+            <Button leftIcon={<FiPlus />} colorScheme="blue" onClick={() => { setSelectedUser(null); onOpen(); }}>
+              New User
             </Button>
           </HStack>
-        </HStack>
-      </CardHeader>
+        </CardHeader>
 
-      <CardBody>
-        {loading ? (
-          <Box textAlign="center" py={10}>
-            <Spinner size="xl" />
-            <Text mt={4}>Loading users...</Text>
-          </Box>
-        ) : users.length === 0 ? (
-          <Box textAlign="center" py={10}>
-            <Text fontSize="lg" color="gray.500" mb={4}>
-              No users found
-            </Text>
-            <Button colorScheme="blue" onClick={() => setShowCreateModal(true)}>
-              Create Your First User
-            </Button>
-          </Box>
-        ) : (
-          <Box overflowX="auto">
-            <Table variant="simple">
-              <Thead>
+        <CardBody>
+          <InputGroup mb={6} maxW="400px">
+            <InputLeftElement children={<FiSearch color="gray.400" />} />
+            <Input 
+              placeholder="Search by name or email..." 
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+            />
+          </InputGroup>
+
+          {loading ? (
+            <Center py={20}><Spinner color="blue.500" /></Center>
+          ) : (
+            <Table variant="simple" size="sm">
+              <Thead bg="gray.50">
                 <Tr>
-                  <Th>Name</Th>
-                  <Th>Email</Th>
+                  <Th>Name & Profile</Th>
                   <Th>Role</Th>
                   <Th>Department</Th>
-                  <Th>Hire Date</Th>
                   <Th>Status</Th>
-                  <Th>Actions</Th>
+                  <Th textAlign="right">Actions</Th>
                 </Tr>
               </Thead>
               <Tbody>
-                {users.map((user) => (
-                  <Tr key={user.id}>
-                    <Td fontWeight="medium">{user.full_name}</Td>
-                    <Td>{user.email}</Td>
+                {filteredUsers.map((user) => (
+                  <Tr key={user.id} _hover={{ bg: "gray.25" }}>
                     <Td>
-                      <Badge colorScheme={getRoleBadgeColor(user.role)}>
+                      <HStack spacing={3}>
+                        <Avatar size="xs" name={user.full_name} src={user.avatar_url} />
+                        <Box>
+                          <Text fontWeight="bold" fontSize="xs">{user.full_name}</Text>
+                          <Text fontSize="10px" color="gray.500">{user.email}</Text>
+                        </Box>
+                      </HStack>
+                    </Td>
+                    <Td>
+                      <Badge variant="subtle" colorScheme={user.role === 'admin' ? 'purple' : 'gray'}>
                         {user.role}
                       </Badge>
                     </Td>
-                    <Td>{getDepartmentName(user.department_id)}</Td>
-                    <Td>{new Date(user.hire_date).toLocaleDateString()}</Td>
-                    <Td>
-                      <Badge
-                        colorScheme={user.is_active ? "green" : "red"}
-                        cursor="pointer"
-                        onClick={() => handleToggleActive(user)}
-                      >
-                        {user.is_active ? "Active" : "Inactive"}
-                      </Badge>
+                    <Td fontSize="xs" color="gray.600">
+                      {departments.find(d => d.id === user.department_id)?.code || "—"}
                     </Td>
                     <Td>
-                      <HStack spacing={2}>
-                        <IconButton
-                          aria-label="Edit user"
-                          icon={<EditIcon />}
-                          size="sm"
-                          colorScheme="blue"
-                          variant="ghost"
-                          onClick={() => openEditModal(user)}
-                        />
-                        <IconButton
-                          aria-label="Delete user"
-                          icon={<DeleteIcon />}
-                          size="sm"
-                          colorScheme="red"
-                          variant="ghost"
-                          onClick={() => handleDeleteClick(user)}
-                        />
-                      </HStack>
+                      <Badge variant="dot" colorScheme={user.is_active ? "green" : "red"}>
+                        {user.is_active ? "Active" : "Disabled"}
+                      </Badge>
+                    </Td>
+                    <Td textAlign="right">
+                      <Menu>
+                        <MenuButton as={IconButton} icon={<FiMoreVertical />} size="xs" variant="ghost" />
+                        <MenuList fontSize="sm">
+                          <MenuItem icon={<FiEdit2 />} onClick={() => { setSelectedUser(user); onOpen(); }}>Edit Profile</MenuItem>
+                          <MenuItem icon={<FiPower />} onClick={() => handleToggleStatus(user)}>
+                            {user.is_active ? "Deactivate Account" : "Activate Account"}
+                          </MenuItem>
+                          <MenuItem icon={<FiTrash2 />} color="red.500" onClick={() => setUserToDelete(user)}>Delete User</MenuItem>
+                        </MenuList>
+                      </Menu>
                     </Td>
                   </Tr>
                 ))}
               </Tbody>
             </Table>
-          </Box>
-        )}
-      </CardBody>
+          )}
+        </CardBody>
+      </Card>
 
-      {/* CREATE USER MODAL */}
-      <Modal
-        isOpen={showCreateModal}
-        onClose={() => setShowCreateModal(false)}
-        size="lg"
-      >
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Create New User</ModalHeader>
-          <ModalCloseButton />
-          <form onSubmit={handleCreateUser}>
-            <ModalBody>
-              <VStack spacing={4}>
-                <FormControl isRequired>
-                  <FormLabel>Email</FormLabel>
-                  <Input
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
-                    placeholder="user@company.com"
-                  />
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Full Name</FormLabel>
-                  <Input
-                    value={formData.full_name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, full_name: e.target.value })
-                    }
-                    placeholder="John Doe"
-                  />
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Password</FormLabel>
-                  <Input
-                    type="password"
-                    value={formData.password}
-                    onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
-                    placeholder="Minimum 6 characters"
-                  />
-                  <Text fontSize="sm" color="gray.500" mt={1}>
-                    Password must be at least 6 characters
-                  </Text>
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Role</FormLabel>
-                  <Select
-                    value={formData.role}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        role: e.target.value as UserRole,
-                      })
-                    }
-                  >
-                    <option value="staff">Staff</option>
-                    <option value="director">Director</option>
-                    <option value="hr">HR</option>
-                    <option value="admin">Admin</option>
-                  </Select>
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Department (Optional)</FormLabel>
-                  <Select
-                    value={formData.department_id}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        department_id: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="">No Department</option>
-                    {departments.map((dept) => (
-                      <option key={dept.id} value={dept.id}>
-                        {dept.name} ({dept.code})
-                      </option>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Hire Date</FormLabel>
-                  <Input
-                    type="date"
-                    value={formData.hire_date}
-                    onChange={(e) =>
-                      setFormData({ ...formData, hire_date: e.target.value })
-                    }
-                  />
-                </FormControl>
-              </VStack>
-            </ModalBody>
-
-            <ModalFooter>
-              <Button
-                variant="ghost"
-                mr={3}
-                onClick={() => setShowCreateModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button colorScheme="blue" type="submit">
-                Create User
-              </Button>
-            </ModalFooter>
-          </form>
-        </ModalContent>
-      </Modal>
-
-      {/* EDIT USER MODAL */}
-      <Modal
-        isOpen={showEditModal}
-        onClose={() => setShowEditModal(false)}
-        size="lg"
-      >
-        <ModalOverlay />
-        <ModalContent>
-          <ModalHeader>Edit User</ModalHeader>
-          <ModalCloseButton />
-          <form onSubmit={handleUpdateUser}>
-            <ModalBody>
-              <VStack spacing={4}>
-                <FormControl>
-                  <FormLabel>Email</FormLabel>
-                  <Input value={formData.email} isReadOnly bg="gray.50" />
-                  <Text fontSize="sm" color="gray.500" mt={1}>
-                    Email cannot be changed
-                  </Text>
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Full Name</FormLabel>
-                  <Input
-                    value={formData.full_name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, full_name: e.target.value })
-                    }
-                  />
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Role</FormLabel>
-                  <Select
-                    value={formData.role}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        role: e.target.value as UserRole,
-                      })
-                    }
-                  >
-                    <option value="staff">Staff</option>
-                    <option value="director">Director</option>
-                    <option value="hr">HR</option>
-                    <option value="admin">Admin</option>
-                  </Select>
-                </FormControl>
-
-                <FormControl>
-                  <FormLabel>Department</FormLabel>
-                  <Select
-                    value={formData.department_id}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        department_id: e.target.value,
-                      })
-                    }
-                  >
-                    <option value="">No Department</option>
-                    {departments.map((dept) => (
-                      <option key={dept.id} value={dept.id}>
-                        {dept.name} ({dept.code})
-                      </option>
-                    ))}
-                  </Select>
-                </FormControl>
-
-                <FormControl isRequired>
-                  <FormLabel>Hire Date</FormLabel>
-                  <Input
-                    type="date"
-                    value={formData.hire_date}
-                    onChange={(e) =>
-                      setFormData({ ...formData, hire_date: e.target.value })
-                    }
-                  />
-                </FormControl>
-              </VStack>
-            </ModalBody>
-
-            <ModalFooter>
-              <Button
-                variant="ghost"
-                mr={3}
-                onClick={() => setShowEditModal(false)}
-              >
-                Cancel
-              </Button>
-              <Button colorScheme="blue" type="submit">
-                Update User
-              </Button>
-            </ModalFooter>
-          </form>
-        </ModalContent>
-      </Modal>
-
-      {/* DELETE CONFIRMATION DIALOG */}
-      <DeleteConfirmDialog
-        isOpen={isDeleteDialogOpen}
-        onClose={onDeleteDialogClose}
-        onConfirm={handleDeleteConfirm}
-        userName={userToDelete?.full_name || ""}
-        isDeleting={isDeleting}
+      <UserForm 
+        key={selectedUser?.id || "new-user"}
+        user={selectedUser}
+        departments={departments}
+        isOpen={isOpen}
+        onClose={onClose}
+        onSuccess={fetchUsers}
       />
-    </Card>
+
+      {/* Delete Confirmation Alert */}
+      <AlertDialog isOpen={!!userToDelete} leastDestructiveRef={cancelRef} onClose={() => setUserToDelete(null)}>
+        <AlertDialogOverlay>
+          <AlertDialogContent borderRadius="xl">
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">Remove Staff Member</AlertDialogHeader>
+            <AlertDialogBody>
+              Are you sure? This will permanently delete <b>{userToDelete?.full_name}</b> and all their records. This cannot be undone.
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Button ref={cancelRef} onClick={() => setUserToDelete(null)} variant="ghost">Cancel</Button>
+              <Button colorScheme="red" onClick={handleDelete} ml={3}>Delete Forever</Button>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
+    </VStack>
   );
 }
+
+// Helper Center component
+const Center = ({ children, ...props }: any) => <Box display="flex" justifyContent="center" alignItems="center" {...props}>{children}</Box>;

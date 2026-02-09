@@ -1,27 +1,9 @@
-// ============================================
-// Department Management Component
-// ============================================
-
 import React, { useState, useRef } from "react";
 import {
   Box,
   Button,
-  Card,
-  CardBody,
-  CardHeader,
-  FormControl,
-  FormLabel,
   Heading,
   HStack,
-  Input,
-  Modal,
-  ModalBody,
-  ModalCloseButton,
-  ModalContent,
-  ModalFooter,
-  ModalHeader,
-  ModalOverlay,
-  Select,
   Table,
   Tbody,
   Td,
@@ -40,272 +22,121 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogOverlay,
+  Avatar,
+  Spinner,
+  Center,
+  Icon,
 } from "@chakra-ui/react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  getDepartments,
-  createDepartment,
-  updateDepartment,
-  deleteDepartment,
-} from "@/api/departments.api";
-import { supabase } from "@/lib/supabase";
-
-interface DepartmentFormProps {
-  department?: any;
-  isOpen: boolean;
-  onClose: () => void;
-  onSuccess: () => void;
-}
-
-function DepartmentForm({
-  department,
-  isOpen,
-  onClose,
-  onSuccess,
-}: DepartmentFormProps) {
-  const [name, setName] = useState(department?.name || "");
-  const [code, setCode] = useState(department?.code || "");
-  const [directorId, setDirectorId] = useState(department?.director_id || "");
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const toast = useToast();
-
-  // Fetch potential directors (users with director/admin role)
-  const { data: directors } = useQuery({
-    queryKey: ["directors"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("users")
-        .select("id, full_name, email, role")
-        .in("role", ["director", "admin"])
-        .eq("is_active", true)
-        .order("full_name");
-
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSubmitting(true);
-
-    try {
-      if (department) {
-        // Update existing
-        await updateDepartment(department.id, {
-          name,
-          code,
-          director_id: directorId || null,
-        });
-        toast({
-          title: "Department updated",
-          status: "success",
-          duration: 3000,
-        });
-      } else {
-        // Create new
-        await createDepartment({
-          name,
-          code,
-          director_id: directorId || undefined,
-        });
-        toast({
-          title: "Department created",
-          status: "success",
-          duration: 3000,
-        });
-      }
-      onSuccess();
-      onClose();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        status: "error",
-        duration: 5000,
-      });
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} size="lg">
-      <ModalOverlay />
-      <ModalContent>
-        <form onSubmit={handleSubmit}>
-          <ModalHeader>
-            {department ? "Edit Department" : "Create Department"}
-          </ModalHeader>
-          <ModalCloseButton />
-          <ModalBody>
-            <VStack spacing={4}>
-              <FormControl isRequired>
-                <FormLabel>Department Name</FormLabel>
-                <Input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="e.g., Engineering"
-                />
-              </FormControl>
-
-              <FormControl isRequired>
-                <FormLabel>Department Code</FormLabel>
-                <Input
-                  value={code}
-                  onChange={(e) => setCode(e.target.value.toUpperCase())}
-                  placeholder="e.g., ENG"
-                  maxLength={10}
-                />
-              </FormControl>
-
-              <FormControl>
-                <FormLabel>Department Director</FormLabel>
-                <Select
-                  value={directorId}
-                  onChange={(e) => setDirectorId(e.target.value)}
-                  placeholder="Select director (optional)"
-                >
-                  {directors?.map((director) => (
-                    <option key={director.id} value={director.id}>
-                      {director.full_name} ({director.email})
-                    </option>
-                  ))}
-                </Select>
-              </FormControl>
-            </VStack>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="ghost" mr={3} onClick={onClose}>
-              Cancel
-            </Button>
-            <Button colorScheme="blue" type="submit" isLoading={isSubmitting}>
-              {department ? "Update" : "Create"}
-            </Button>
-          </ModalFooter>
-        </form>
-      </ModalContent>
-    </Modal>
-  );
-}
+import { FiPlus, FiEdit2, FiTrash2, FiInfo } from "react-icons/fi";
+import { getDepartments, deleteDepartment } from "@/api/departments.api";
+import { DepartmentForm } from "./DepartmentForm";
 
 export function DepartmentManagement() {
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const [selectedDepartment, setSelectedDepartment] = useState<any>(null);
+  const [selectedDept, setSelectedDept] = useState<any>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const cancelRef = useRef<HTMLButtonElement>(null) as any;
+  const cancelRef = useRef<HTMLButtonElement>(null!);
   const toast = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch departments
-  const {
-    data: departments,
-    isLoading,
-    refetch,
-  } = useQuery({
+  const { data: departments, isLoading } = useQuery({
     queryKey: ["departments"],
     queryFn: getDepartments,
   });
 
-  // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: deleteDepartment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["departments"] });
-      toast({
-        title: "Department deleted",
-        status: "success",
-        duration: 3000,
-      });
+      toast({ title: "Department removed successfully", status: "success" });
       setDeleteId(null);
     },
-    onError: (error: any) => {
-      toast({
-        title: "Error deleting department",
-        description: error.message,
-        status: "error",
-        duration: 5000,
-      });
-    },
+    onError: (err: any) => {
+      toast({ title: "Error", description: err.message, status: "error" });
+    }
   });
 
-  const handleEdit = (department: any) => {
-    setSelectedDepartment(department);
+  const handleEdit = (dept: any) => {
+    setSelectedDept(dept);
     onOpen();
   };
 
   const handleCreate = () => {
-    setSelectedDepartment(null);
+    setSelectedDept(null);
     onOpen();
-  };
-
-  const handleCloseForm = () => {
-    setSelectedDepartment(null);
-    onClose();
-  };
-
-  const handleFormSuccess = () => {
-    refetch();
   };
 
   return (
     <Box>
-      <Card>
-        <CardHeader>
-          <HStack justify="space-between">
+      <VStack align="stretch" spacing={6}>
+        <HStack justify="space-between">
+          <Box>
             <Heading size="md">Department Management</Heading>
-            <Button colorScheme="blue" onClick={handleCreate}>
-              Create Department
-            </Button>
-          </HStack>
-        </CardHeader>
-        <CardBody>
+            <Text fontSize="sm" color="gray.500">Create and manage organizational units and their leadership.</Text>
+          </Box>
+          <Button leftIcon={<FiPlus />} colorScheme="blue" onClick={handleCreate} boxShadow="sm">
+            Add Department
+          </Button>
+        </HStack>
+
+        <Box bg="white" borderRadius="xl" border="1px solid" borderColor="gray.100" shadow="sm" overflow="hidden">
           {isLoading ? (
-            <Text>Loading departments...</Text>
+            <Center py={20}>
+              <VStack spacing={4}>
+                <Spinner color="blue.500" />
+                <Text color="gray.500">Loading your organization structure...</Text>
+              </VStack>
+            </Center>
           ) : departments && departments.length > 0 ? (
             <Table variant="simple">
-              <Thead>
+              <Thead bg="gray.50">
                 <Tr>
-                  <Th>Code</Th>
-                  <Th>Name</Th>
-                  <Th>Director</Th>
-                  <Th>Actions</Th>
+                  <Th color="gray.600" width="120px">Code</Th>
+                  <Th color="gray.600">Department Name</Th>
+                  <Th color="gray.600">Director</Th>
+                  <Th color="gray.600" textAlign="right">Actions</Th>
                 </Tr>
               </Thead>
               <Tbody>
                 {departments.map((dept: any) => (
-                  <Tr key={dept.id}>
+                  <Tr key={dept.id} _hover={{ bg: "gray.25" }}>
                     <Td>
-                      <Badge colorScheme="blue">{dept.code}</Badge>
+                      <Badge variant="subtle" colorScheme="blue" px={2} py={1} borderRadius="md">
+                        {dept.code}
+                      </Badge>
                     </Td>
-                    <Td fontWeight="medium">{dept.name}</Td>
+                    <Td fontWeight="bold" fontSize="sm">{dept.name}</Td>
                     <Td>
                       {dept.director ? (
-                        <VStack align="start" spacing={0}>
-                          <Text fontSize="sm">{dept.director.full_name}</Text>
-                          <Text fontSize="xs" color="gray.500">
-                            {dept.director.email}
-                          </Text>
-                        </VStack>
+                        <HStack spacing={2}>
+                          <Avatar size="xs" name={dept.director.full_name} src={dept.director.avatar_url} />
+                          <VStack align="start" spacing={0}>
+                            <Text fontSize="xs" fontWeight="bold">{dept.director.full_name}</Text>
+                            <Text fontSize="xs" color="gray.500">{dept.director.email}</Text>
+                          </VStack>
+                        </HStack>
                       ) : (
-                        <Text fontSize="sm" color="gray.400">
-                          No director assigned
-                        </Text>
+                        <Badge variant="ghost" colorScheme="orange" fontSize="10px">No Director</Badge>
                       )}
                     </Td>
-                    <Td>
-                      <HStack spacing={2}>
-                        <Button size="sm" onClick={() => handleEdit(dept)}>
-                          Edit
-                        </Button>
-                        <Button
+                    <Td textAlign="right">
+                      <HStack spacing={1} justify="flex-end">
+                        <IconButton
+                          aria-label="Edit"
+                          icon={<FiEdit2 />}
                           size="sm"
+                          variant="ghost"
+                          onClick={() => handleEdit(dept)}
+                        />
+                        <IconButton
+                          aria-label="Delete"
+                          icon={<FiTrash2 />}
+                          size="sm"
+                          variant="ghost"
                           colorScheme="red"
-                          variant="outline"
                           onClick={() => setDeleteId(dept.id)}
-                        >
-                          Delete
-                        </Button>
+                        />
                       </HStack>
                     </Td>
                   </Tr>
@@ -313,35 +144,43 @@ export function DepartmentManagement() {
               </Tbody>
             </Table>
           ) : (
-            <Text color="gray.500">
-              No departments found. Create one to get started.
-            </Text>
+            <Center py={20}>
+              <VStack spacing={2}>
+                <Icon as={FiInfo} boxSize={8} color="gray.300" />
+                <Text color="gray.500">No departments found. Start by creating one.</Text>
+              </VStack>
+            </Center>
           )}
-        </CardBody>
-      </Card>
+        </Box>
+      </VStack>
 
-      {/* Create/Edit Modal */}
+      {/* The Key prop forces a clean mount/unmount to reset internal form state */}
       <DepartmentForm
-        department={selectedDepartment}
+        key={selectedDept?.id || "new-dept"}
+        department={selectedDept}
         isOpen={isOpen}
-        onClose={handleCloseForm}
-        onSuccess={handleFormSuccess}
+        onClose={onClose}
+        onSuccess={() => queryClient.invalidateQueries({ queryKey: ["departments"] })}
       />
 
-      {/* Delete Confirmation */}
       <AlertDialog
         isOpen={deleteId !== null}
         leastDestructiveRef={cancelRef}
         onClose={() => setDeleteId(null)}
+        isCentered
       >
-        <AlertDialogOverlay>
-          <AlertDialogContent>
-            <AlertDialogHeader>Delete Department</AlertDialogHeader>
+        <AlertDialogOverlay backdropFilter="blur(2px)">
+          <AlertDialogContent borderRadius="xl">
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              Confirm Delete
+            </AlertDialogHeader>
+
             <AlertDialogBody>
-              Are you sure? This will affect all users in this department.
+              Are you sure? This action cannot be undone and will affect all users currently assigned to this department.
             </AlertDialogBody>
-            <AlertDialogFooter>
-              <Button ref={cancelRef} onClick={() => setDeleteId(null)}>
+
+            <AlertDialogFooter bg="gray.50" borderBottomRadius="xl">
+              <Button ref={cancelRef} onClick={() => setDeleteId(null)} variant="ghost">
                 Cancel
               </Button>
               <Button
@@ -350,7 +189,7 @@ export function DepartmentManagement() {
                 ml={3}
                 isLoading={deleteMutation.isPending}
               >
-                Delete
+                Delete Forever
               </Button>
             </AlertDialogFooter>
           </AlertDialogContent>
