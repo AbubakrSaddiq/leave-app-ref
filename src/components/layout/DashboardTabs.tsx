@@ -16,6 +16,8 @@ export const DashboardTabs = ({ role }: DashboardTabsProps) => {
   const isAdmin = role === "admin";
   const isHR = role === "hr";
   const isDirector = role === "director";
+// Group permissions: Admin OR HR can access system settings
+  const canManageSystem = isAdmin || isHR;
 
   return (
     <Tabs colorScheme="blue" variant="enclosed" isLazy>
@@ -25,8 +27,8 @@ export const DashboardTabs = ({ role }: DashboardTabsProps) => {
         {!isAdmin && <Tab>📋 My Applications</Tab>}
         {isDirector && <Tab>✅ Director Approvals</Tab>}
         {isHR && <Tab>✅ HR Approvals</Tab>}
-        {isAdmin && <Tab>👥 Users</Tab>}
-        {isAdmin && <Tab>🏢 Departments</Tab>}
+        {canManageSystem && <Tab>👥 Users</Tab>}
+        {canManageSystem && <Tab>🏢 Departments</Tab>}
          <Tab>⚙️ Profile</Tab>
       </TabList>
 
@@ -36,8 +38,8 @@ export const DashboardTabs = ({ role }: DashboardTabsProps) => {
         {!isAdmin && <TabPanel><MyLeaveApplications /></TabPanel>}
         {isDirector && <TabPanel><ApprovalQueue role="director" /></TabPanel>}
         {isHR && <TabPanel><ApprovalQueue role="hr" /></TabPanel>}
-        {isAdmin && <TabPanel><UserManagement /></TabPanel>}
-        {isAdmin && <TabPanel><DepartmentManagement /></TabPanel>}
+        {canManageSystem && <TabPanel><UserManagement /></TabPanel>}
+        {canManageSystem && <TabPanel><DepartmentManagement /></TabPanel>}
           <TabPanel><ProfilePage /></TabPanel>
       </TabPanels>
     </Tabs>
