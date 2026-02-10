@@ -129,7 +129,7 @@ export const LoginForm = () => {
         <Divider />
 
         <Text fontSize="sm" color="gray.500" textAlign="center">
-          Staff ID login is managed by the ICT Department.
+          Staff ID login is managed by the ICT .
         </Text>
       </VStack>
     </Box>

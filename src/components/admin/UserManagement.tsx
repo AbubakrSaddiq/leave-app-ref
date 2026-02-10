@@ -16,6 +16,7 @@ export function UserManagement() {
   const toast = useToast();
   const [users, setUsers] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
+  const [designations, setDesignations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -34,14 +35,22 @@ export function UserManagement() {
     setLoading(false);
   };
 
+  // Fetch designations for display in user list and form
   const fetchDepartments = async () => {
     const { data } = await supabase.from("departments").select("id, name, code");
     if (data) setDepartments(data);
   };
 
+  // Fetch designations for display in user list and form
+  const fetchDesignations = async () => {
+    const { data } = await supabase.from("designations").select("id, name, code");
+    if (data) setDesignations(data);
+  };
+
   useEffect(() => {
     fetchUsers();
     fetchDepartments();
+    fetchDesignations();
   }, []);
 
   const handleDelete = async () => {
@@ -104,6 +113,7 @@ export function UserManagement() {
                   <Th>Name & Profile</Th>
                   <Th>Role</Th>
                   <Th>Department</Th>
+                  <Th>Designation</Th>
                   <Th>Status</Th>
                   <Th textAlign="right">Actions</Th>
                 </Tr>
@@ -127,6 +137,9 @@ export function UserManagement() {
                     </Td>
                     <Td fontSize="xs" color="gray.600">
                       {departments.find(d => d.id === user.department_id)?.code || "—"}
+                    </Td>
+                    <Td fontSize="xs" color="gray.600">
+                      {designations.find(d => d.id === user.designation_id)?.code || "—"}
                     </Td>
                     <Td>
                       <Badge variant="dot" colorScheme={user.is_active ? "green" : "red"}>

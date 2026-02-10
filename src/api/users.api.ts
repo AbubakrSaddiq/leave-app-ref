@@ -1,5 +1,5 @@
 // ============================================
-// Users API
+// Users API - UPDATED WITH DESIGNATION SUPPORT
 // ============================================
 
 import { supabase } from '@/lib/supabase';
@@ -14,6 +14,7 @@ export interface UserFilters {
   limit?: number;
   role?: UserRole;
   department_id?: string;
+  designation_id?: string;
   search?: string;
   is_active?: boolean;
 }
@@ -34,16 +35,15 @@ export interface CreateUserParams {
   password: string;
   role: UserRole;
   department_id: string;
-  hire_date: string;
-
+  designation_id?: string; // UPDATED: Added designation
 }
 
 export interface UpdateUserParams {
   full_name?: string;
   role?: UserRole;
   department_id?: string;
+  designation_id?: string; // UPDATED: Added designation
   is_active?: boolean;
-
 }
 
 // ============================================
@@ -52,6 +52,7 @@ export interface UpdateUserParams {
 
 /**
  * Get all users with filters and pagination
+ * UPDATED: Now includes designation in the query
  */
 export async function getUsers(filters?: UserFilters): Promise<PaginatedUsers> {
   try {
@@ -60,17 +61,19 @@ export async function getUsers(filters?: UserFilters): Promise<PaginatedUsers> {
       limit = 20,
       role,
       department_id,
+      designation_id,
       search,
       is_active,
     } = filters || {};
 
-    // Build query
+    // Build query - UPDATED: Added designation join
     let query = supabase
       .from('users')
       .select(
         `
         *,
-        department:departments(id, name, code)
+        department:departments(id, name, code),
+        designation:designations(id, name, code)
       `,
         { count: 'exact' }
       );
@@ -81,6 +84,9 @@ export async function getUsers(filters?: UserFilters): Promise<PaginatedUsers> {
     }
     if (department_id) {
       query = query.eq('department_id', department_id);
+    }
+    if (designation_id) {
+      query = query.eq('designation_id', designation_id);
     }
     if (is_active !== undefined) {
       query = query.eq('is_active', is_active);
@@ -120,6 +126,7 @@ export async function getUsers(filters?: UserFilters): Promise<PaginatedUsers> {
 
 /**
  * Get single user by ID
+ * UPDATED: Now includes designation
  */
 export async function getUserById(id: string): Promise<User> {
   try {
@@ -128,7 +135,8 @@ export async function getUserById(id: string): Promise<User> {
       .select(
         `
         *,
-        department:departments(id, name, code)
+        department:departments(id, name, code),
+        designation:designations(id, name, code)
       `
       )
       .eq('id', id)
@@ -144,12 +152,13 @@ export async function getUserById(id: string): Promise<User> {
 
 /**
  * Create new user (Admin only)
+ * UPDATED: Now includes designation_id
  */
 export async function createUser(params: CreateUserParams): Promise<User> {
   try {
-    const { email, password, full_name, role, department_id, hire_date } = params;
+    const { email, password, full_name, role, department_id, designation_id } = params;
 
-    console.log('Creating user:', { email, full_name, role, department_id, hire_date });
+    console.log('Creating user:', { email, full_name, role, department_id, designation_id });
 
     // 1. Create auth user
     const { data: authData, error: authError } = await supabase.auth.signUp({
@@ -183,14 +192,15 @@ export async function createUser(params: CreateUserParams): Promise<User> {
         full_name,
         role,
         department_id,
-        hire_date,
+        designation_id: designation_id || null, // UPDATED: Added designation
         is_active: true,
       })
       .eq('id', authData.user.id)
       .select(
         `
         *,
-        department:departments(id, name, code)
+        department:departments(id, name, code),
+        designation:designations(id, name, code)
       `
       )
       .single();
@@ -210,13 +220,14 @@ export async function createUser(params: CreateUserParams): Promise<User> {
             full_name,
             role,
             department_id,
-            hire_date,
+            designation_id: designation_id || null, // UPDATED: Added designation
             is_active: true,
           })
           .select(
             `
             *,
-            department:departments(id, name, code)
+            department:departments(id, name, code),
+            designation:designations(id, name, code)
           `
           )
           .single();
@@ -231,7 +242,7 @@ export async function createUser(params: CreateUserParams): Promise<User> {
         const { error: allocError } = await supabase.rpc('allocate_leave_for_user', {
           p_user_id: authData.user.id,
           p_year: new Date().getFullYear(),
-          p_hire_date: hire_date,
+          p_hire_date: null,
         });
 
         if (allocError) {
@@ -249,7 +260,7 @@ export async function createUser(params: CreateUserParams): Promise<User> {
     const { error: allocError } = await supabase.rpc('allocate_leave_for_user', {
       p_user_id: authData.user.id,
       p_year: new Date().getFullYear(),
-      p_hire_date: hire_date,
+      p_hire_date: null,
     });
 
     if (allocError) {
@@ -267,6 +278,7 @@ export async function createUser(params: CreateUserParams): Promise<User> {
 
 /**
  * Update user profile (Admin only)
+ * UPDATED: Now includes designation_id
  */
 export async function updateUser(
   id: string,
@@ -280,7 +292,8 @@ export async function updateUser(
       .select(
         `
         *,
-        department:departments(id, name, code)
+        department:departments(id, name, code),
+        designation:designations(id, name, code)
       `
       )
       .single();
@@ -369,12 +382,14 @@ export async function bulkImportUsers(
 
 /**
  * Get user statistics
+ * UPDATED: Now includes designation stats
  */
 export async function getUserStatistics(): Promise<{
   total_users: number;
   active_users: number;
   by_role: Array<{ role: UserRole; count: number }>;
   by_department: Array<{ department: string; count: number }>;
+  by_designation: Array<{ designation: string; count: number }>;
 }> {
   try {
     // Get all users
@@ -385,7 +400,8 @@ export async function getUserStatistics(): Promise<{
         id,
         role,
         is_active,
-        department:departments(name)
+        department:departments(name),
+        designation:designations(name)
       `
       );
 
@@ -415,11 +431,23 @@ export async function getUserStatistics(): Promise<{
       count,
     }));
 
+    // Group by designation - UPDATED: Added this
+    const desigGroups: Record<string, number> = {};
+    users?.forEach((u) => {
+      const desigName = (u.designation as any)?.name || 'Unassigned';
+      desigGroups[desigName] = (desigGroups[desigName] || 0) + 1;
+    });
+    const by_designation = Object.entries(desigGroups).map(([designation, count]) => ({
+      designation,
+      count,
+    }));
+
     return {
       total_users,
       active_users,
       by_role,
       by_department,
+      by_designation,
     };
   } catch (error: any) {
     console.error('Error fetching user statistics:', error);

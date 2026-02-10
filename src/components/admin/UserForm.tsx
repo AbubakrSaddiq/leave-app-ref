@@ -6,11 +6,13 @@ import {
   Icon, Text, Box, HStack, RadioGroup, Radio, Stack, InputRightElement,
   IconButton, Tooltip, Badge
 } from "@chakra-ui/react";
-import { FiUser, FiMail, FiLock, FiShield, FiBriefcase, FiCalendar, FiRefreshCw, FiCopy, FiEye, FiEyeOff } from "react-icons/fi";
+import { FiUser, FiMail, FiLock, FiShield, FiBriefcase, FiAward, FiRefreshCw, FiCopy, FiEye, FiEyeOff } from "react-icons/fi";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
+import { getDesignations } from "@/api/designation.api";
 
 interface UserFormProps {
-  user?: any; // The selected user if editing
+  user?: any;
   departments: any[];
   isOpen: boolean;
   onClose: () => void;
@@ -19,7 +21,6 @@ interface UserFormProps {
 
 const DEFAULT_PASSWORD = "Naseni123!";
 
-// Password generator function
 const generateSecurePassword = (): string => {
   const length = 12;
   const uppercase = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
@@ -29,18 +30,15 @@ const generateSecurePassword = (): string => {
   const allChars = uppercase + lowercase + numbers + symbols;
   
   let password = "";
-  // Ensure at least one of each type
   password += uppercase[Math.floor(Math.random() * uppercase.length)];
   password += lowercase[Math.floor(Math.random() * lowercase.length)];
   password += numbers[Math.floor(Math.random() * numbers.length)];
   password += symbols[Math.floor(Math.random() * symbols.length)];
   
-  // Fill the rest randomly
   for (let i = password.length; i < length; i++) {
     password += allChars[Math.floor(Math.random() * allChars.length)];
   }
   
-  // Shuffle the password
   return password.split('').sort(() => Math.random() - 0.5).join('');
 };
 
@@ -61,12 +59,18 @@ export const UserForm: React.FC<UserFormProps> = ({
     password: DEFAULT_PASSWORD,
     role: user?.role || "staff",
     department_id: user?.department_id || "",
-    hire_date: user?.hire_date || new Date().toISOString().split("T")[0],
+    designation_id: user?.designation_id || "", // UPDATED: Added designation
+  });
+
+  // Fetch designations
+  const { data: designations, isLoading: loadingDesignations } = useQuery({
+    queryKey: ["designations"],
+    queryFn: getDesignations,
   });
 
   // Update password when option changes
   useEffect(() => {
-    if (!user) { // Only for new users
+    if (!user) {
       if (passwordOption === "default") {
         setFormData(prev => ({ ...prev, password: DEFAULT_PASSWORD }));
       } else {
@@ -85,9 +89,19 @@ export const UserForm: React.FC<UserFormProps> = ({
         password: DEFAULT_PASSWORD,
         role: "staff",
         department_id: "",
-        hire_date: new Date().toISOString().split("T")[0],
+        designation_id: "", // UPDATED: Reset designation
       });
       setShowPassword(false);
+    } else if (isOpen && user) {
+      // When editing, populate with user data
+      setFormData({
+        email: user.email || "",
+        full_name: user.full_name || "",
+        password: "",
+        role: user.role || "staff",
+        department_id: user.department_id || "",
+        designation_id: user.designation_id || "", // UPDATED: Populate designation
+      });
     }
   }, [isOpen, user]);
 
@@ -126,14 +140,14 @@ export const UserForm: React.FC<UserFormProps> = ({
             full_name: formData.full_name,
             role: formData.role,
             department_id: formData.department_id || null,
-            hire_date: formData.hire_date,
+            designation_id: formData.designation_id || null, // UPDATED: Include designation
           })
           .eq("id", user.id);
 
         if (error) throw error;
         toast({ title: "User updated successfully", status: "success" });
       } else {
-        // CREATE MODE (Uses Edge Function for Auth + DB sync)
+        // CREATE MODE
         const { data, error } = await supabase.functions.invoke("admin-create-user", {
           body: {
             email: formData.email,
@@ -142,14 +156,13 @@ export const UserForm: React.FC<UserFormProps> = ({
               full_name: formData.full_name,
               role: formData.role,
               department_id: formData.department_id,
-              hire_date: "01/02/2026",
+              designation_id: formData.designation_id, // UPDATED: Include designation
             },
           },
         });
-        
+
         if (error) throw error;
         
-        // Show success with password info
         toast({
           title: "User created successfully",
           description: passwordOption === "auto" 
@@ -160,7 +173,6 @@ export const UserForm: React.FC<UserFormProps> = ({
           isClosable: true,
         });
         
-        // Auto-copy password to clipboard on create
         navigator.clipboard.writeText(formData.password);
       }
       onSuccess();
@@ -324,6 +336,28 @@ export const UserForm: React.FC<UserFormProps> = ({
                   </InputGroup>
                 </FormControl>
               </HStack>
+
+              {/* UPDATED: Added Designation Field */}
+              <FormControl>
+                <FormLabel fontSize="xs" fontWeight="bold">Designation</FormLabel>
+                <InputGroup>
+                  <InputLeftElement children={<Icon as={FiAward} color="gray.400" />} />
+                  <Select 
+                    pl="40px"
+                    value={formData.designation_id}
+                    onChange={(e) => setFormData({...formData, designation_id: e.target.value})}
+                    placeholder="Select designation"
+                    isDisabled={loadingDesignations}
+                  >
+                    {designations?.map(d => (
+                      <option key={d.id} value={d.id}>{d.name}</option>
+                    ))}
+                  </Select>
+                </InputGroup>
+                <Text fontSize="xs" color="gray.500" mt={1}>
+                  Job title/position (e.g., Director, Manager, Officer)
+                </Text>
+              </FormControl>
             </VStack>
           </ModalBody>
 

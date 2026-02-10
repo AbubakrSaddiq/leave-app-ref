@@ -8,6 +8,7 @@ import { AnalyticsDashboard } from "@/components/analytics/AnalyticsDashboard";
 import { DepartmentManagement } from "@/components/admin/DepartmentManagement";
 import { UserManagement } from "@/components/admin/UserManagement";
 import { ProfilePage } from "../profile/ProfilePage";
+import { DesignationManagement } from "../admin/DesignationManagement";
 interface DashboardTabsProps {
   role: UserRole;
 }
@@ -29,6 +30,7 @@ export const DashboardTabs = ({ role }: DashboardTabsProps) => {
         {isHR && <Tab>✅ HR Approvals</Tab>}
         {canManageSystem && <Tab>👥 Users</Tab>}
         {canManageSystem && <Tab>🏢 Departments</Tab>}
+         {canManageSystem && <Tab>🏢 Designations</Tab>}
          <Tab>⚙️ Profile</Tab>
       </TabList>
 
@@ -40,6 +42,7 @@ export const DashboardTabs = ({ role }: DashboardTabsProps) => {
         {isHR && <TabPanel><ApprovalQueue role="hr" /></TabPanel>}
         {canManageSystem && <TabPanel><UserManagement /></TabPanel>}
         {canManageSystem && <TabPanel><DepartmentManagement /></TabPanel>}
+        {canManageSystem && <TabPanel><DesignationManagement /></TabPanel>}
           <TabPanel><ProfilePage /></TabPanel>
       </TabPanels>
     </Tabs>

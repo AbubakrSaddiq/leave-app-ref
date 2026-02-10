@@ -55,12 +55,17 @@ export interface User {
   created_at: string;
   updated_at: string;
   department?: Department;
+  designation?: Designation;
+}
 
-    // Relations (populated by queries)
-  // department?: Department;
-  // director?: User;
-  // leave_balances?: LeaveBalance[];
-  // leave_applications?: LeaveApplication[];
+export interface Designation {
+  id: string;
+  name: string;
+  code: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Department {
