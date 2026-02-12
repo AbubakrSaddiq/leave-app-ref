@@ -56,6 +56,7 @@ export interface User {
   updated_at: string;
   department?: Department;
   designation?: Designation;
+   has_submitted_desired_months: boolean;
 }
 
 export interface Designation {

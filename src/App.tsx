@@ -4,6 +4,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { useAuth } from "@/hooks/useAuth"; 
 import { UserNav } from "@/components/auth/UserNav";
 import { DashboardTabs } from "@/components/layout/DashboardTabs";
+import { DesiredMonthsChecker } from "@/components/desiredMonths/DesiredMonthsChecker";
 
 const queryClient = new QueryClient();
 
@@ -11,14 +12,16 @@ const MainContent = () => {
   const { profile } = useAuth();
   
   return (
- 
-       <Container maxW="container.xl" py={8}  >
-      <Heading mb={6}>Leave Management System</Heading>
-      <UserNav />
-      {profile && <DashboardTabs role={profile.role} />}
-    </Container>
-  
-   
+    <>
+      <Container maxW="container.xl" py={8}>
+        <Heading mb={6}>Leave Management System</Heading>
+        <UserNav />
+        {profile && <DashboardTabs role={profile.role} />}
+      </Container>
+      
+      {/* Check and prompt for desired months if not submitted */}
+      <DesiredMonthsChecker />
+    </>
   );
 };
 

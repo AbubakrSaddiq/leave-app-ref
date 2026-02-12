@@ -9,6 +9,7 @@ import { DepartmentManagement } from "@/components/admin/DepartmentManagement";
 import { UserManagement } from "@/components/admin/UserManagement";
 import { ProfilePage } from "../profile/ProfilePage";
 import { DesignationManagement } from "../admin/DesignationManagement";
+import { DesiredMonthsAdminView } from "../desiredMonths/DesiredMonthsAdminView";
 interface DashboardTabsProps {
   role: UserRole;
 }
@@ -30,7 +31,8 @@ export const DashboardTabs = ({ role }: DashboardTabsProps) => {
         {isHR && <Tab>✅ HR Approvals</Tab>}
         {canManageSystem && <Tab>👥 Users</Tab>}
         {canManageSystem && <Tab>🏢 Departments</Tab>}
-         {canManageSystem && <Tab>🏢 Designations</Tab>}
+         {canManageSystem && <Tab>👔 Designations</Tab>}
+          {canManageSystem && <Tab>📅 Desired Months</Tab>}
          <Tab>⚙️ Profile</Tab>
       </TabList>
 
@@ -43,7 +45,8 @@ export const DashboardTabs = ({ role }: DashboardTabsProps) => {
         {canManageSystem && <TabPanel><UserManagement /></TabPanel>}
         {canManageSystem && <TabPanel><DepartmentManagement /></TabPanel>}
         {canManageSystem && <TabPanel><DesignationManagement /></TabPanel>}
-          <TabPanel><ProfilePage /></TabPanel>
+        {canManageSystem && <TabPanel><DesiredMonthsAdminView /></TabPanel>}
+         <TabPanel><ProfilePage /></TabPanel>
       </TabPanels>
     </Tabs>
   );

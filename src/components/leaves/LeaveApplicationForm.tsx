@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import {
   Box,
   Button,
@@ -24,11 +24,19 @@ import {
   NumberDecrementStepper,
   Spinner,
   Badge,
+  Icon,
 } from "@chakra-ui/react";
+import { FiAlertTriangle, FiCheckCircle } from "react-icons/fi";
 import { useLeaveForm } from "@/hooks/useLeaveForm";
 import { LEAVE_TYPE_OPTIONS } from "@/constants/leaveConstants";
 import { formatDisplayDate } from "@/utils/dateUtils";
 import { format } from "date-fns";
+import { LeaveType } from "@/types/models";
+import { 
+  useValidateLeaveDates, 
+  useHasSubmittedDesiredMonths,
+  useMyDesiredMonths 
+} from "@/hooks/useDesiredLeaveMonths";
 
 interface LeaveApplicationFormProps {
   onSuccess?: () => void;
@@ -61,6 +69,43 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
   } = form;
 
   const leaveType = watch("leave_type");
+  const startDate = watch("start_date");
+
+  // Check desired months submission status
+  const { data: hasSubmitted } = useHasSubmittedDesiredMonths();
+  const { data: desiredMonths } = useMyDesiredMonths();
+
+  // Validate dates against desired months (only for annual leave)
+  const shouldValidateDesiredMonths = 
+    leaveType === LeaveType.ANNUAL && 
+    !!startDate && 
+    !!calculatedEndDate &&
+    !isCalculating;
+
+  const {
+    data: desiredMonthsValidation,
+    isLoading: isValidatingDesiredMonths,
+  } = useValidateLeaveDates(
+    startDate,
+    calculatedEndDate,
+    shouldValidateDesiredMonths
+  );
+
+  // Check if annual leave can be submitted
+  const isAnnualLeaveBlocked = 
+    leaveType === LeaveType.ANNUAL && !hasSubmitted;
+
+  const isDesiredMonthsInvalid = 
+    leaveType === LeaveType.ANNUAL && 
+    desiredMonthsValidation && 
+    !desiredMonthsValidation.is_valid;
+
+  const canSubmit = 
+    !isCalculating && 
+    !isValidatingDesiredMonths &&
+    !!calculatedEndDate && 
+    !isAnnualLeaveBlocked &&
+    !isDesiredMonthsInvalid;
 
   return (
     <Box
@@ -100,6 +145,48 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
           )}
         </FormControl>
 
+        {/* Annual Leave - Desired Months Not Submitted */}
+        {isAnnualLeaveBlocked && (
+          <Alert status="error" borderRadius="md">
+            <AlertIcon />
+            <Box flex="1">
+              <AlertTitle>Desired Months Required</AlertTitle>
+              <AlertDescription>
+                You must submit your desired leave months before applying for annual
+                leave. Please complete the desired months form first.
+              </AlertDescription>
+            </Box>
+          </Alert>
+        )}
+
+        {/* Show desired months info for annual leave */}
+        {leaveType === LeaveType.ANNUAL && desiredMonths && (
+          <Alert status="info" borderRadius="md" variant="left-accent">
+            <AlertIcon />
+            <Box flex="1">
+              <AlertTitle fontSize="sm">Your Desired Leave Months</AlertTitle>
+              <AlertDescription fontSize="sm" mt={2}>
+                <HStack spacing={2} flexWrap="wrap">
+                  {desiredMonths.preferred_months.map((monthNum) => {
+                    const monthNames = [
+                      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                    ];
+                    return (
+                      <Badge key={monthNum} colorScheme="blue" fontSize="xs">
+                        {monthNames[monthNum - 1]}
+                      </Badge>
+                    );
+                  })}
+                </HStack>
+                <Text fontSize="xs" mt={2} color="gray.600">
+                  Your annual leave must fall within these months
+                </Text>
+              </AlertDescription>
+            </Box>
+          </Alert>
+        )}
+
         {/* Dynamic Leave Balance Alert */}
         {currentBalance && (
           <Alert
@@ -127,6 +214,7 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
               {...register("start_date", { required: "Start date is required" })}
               size="lg"
               min={format(new Date(), "yyyy-MM-dd")}
+              isDisabled={isAnnualLeaveBlocked}
             />
             <FormErrorMessage>{errors.start_date?.message}</FormErrorMessage>
           </FormControl>
@@ -139,6 +227,7 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
               min={1}
               max={currentBalance?.available_days || 365}
               size="lg"
+              isDisabled={isAnnualLeaveBlocked}
             >
               <NumberInputField />
               <NumberInputStepper>
@@ -151,7 +240,7 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
         </HStack>
 
         {/* Calculated Leave Summary Section */}
-        {(isCalculating || calculatedEndDate) && (
+        {(isCalculating || calculatedEndDate) && !isAnnualLeaveBlocked && (
           <Alert status="info" variant="left-accent" borderRadius="md" bg="blue.50">
             <Box flex="1">
               <AlertTitle fontSize="md" mb={3} color="blue.900">
@@ -188,6 +277,60 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
           </Alert>
         )}
 
+        {/* Desired Months Validation (Annual Leave Only) */}
+        {isValidatingDesiredMonths && leaveType === LeaveType.ANNUAL && (
+          <Alert status="info" borderRadius="md">
+            <AlertIcon />
+            <HStack>
+              <Spinner size="sm" />
+              <Text fontSize="sm">Validating against your desired months...</Text>
+            </HStack>
+          </Alert>
+        )}
+
+        {desiredMonthsValidation && leaveType === LeaveType.ANNUAL && !isValidatingDesiredMonths && (
+          <Alert
+            status={desiredMonthsValidation.is_valid ? "success" : "error"}
+            borderRadius="md"
+            variant="left-accent"
+          >
+            <AlertIcon as={desiredMonthsValidation.is_valid ? FiCheckCircle : FiAlertTriangle} />
+            <Box flex="1">
+              <AlertTitle fontSize="sm">
+                {desiredMonthsValidation.is_valid 
+                  ? "Dates Valid ✓" 
+                  : "Invalid Date Selection"}
+              </AlertTitle>
+              <AlertDescription fontSize="sm" mt={1}>
+                {desiredMonthsValidation.message}
+              </AlertDescription>
+              {!desiredMonthsValidation.is_valid && desiredMonthsValidation.leave_months && (
+                <Box mt={3}>
+                  <Text fontSize="xs" fontWeight="bold" mb={1}>Leave spans these months:</Text>
+                  <HStack spacing={2}>
+                    {desiredMonthsValidation.leave_months.map((monthNum) => {
+                      const monthNames = [
+                        'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+                        'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                      ];
+                      const isDesired = desiredMonthsValidation.desired_months?.includes(monthNum);
+                      return (
+                        <Badge 
+                          key={monthNum} 
+                          colorScheme={isDesired ? "green" : "red"}
+                          fontSize="xs"
+                        >
+                          {monthNames[monthNum - 1]}
+                        </Badge>
+                      );
+                    })}
+                  </HStack>
+                </Box>
+              )}
+            </Box>
+          </Alert>
+        )}
+
         {/* Reason Field */}
         <FormControl isInvalid={!!errors.reason} isRequired>
           <FormLabel>Reason for Leave</FormLabel>
@@ -199,6 +342,7 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
             placeholder="Provide a detailed reason..."
             size="lg"
             rows={4}
+            isDisabled={isAnnualLeaveBlocked}
           />
           <FormErrorMessage>{errors.reason?.message}</FormErrorMessage>
         </FormControl>
@@ -221,10 +365,16 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
           <Button
             type="submit"
             colorScheme="blue"
-            isLoading={isSubmitting || isCalculating}
-            loadingText={isCalculating ? "Calculating..." : "Submitting..."}
+            isLoading={isSubmitting || isCalculating || isValidatingDesiredMonths}
+            loadingText={
+              isCalculating 
+                ? "Calculating..." 
+                : isValidatingDesiredMonths 
+                ? "Validating..."
+                : "Submitting..."
+            }
             size="lg"
-            isDisabled={!calculatedEndDate || isCalculating}
+            isDisabled={!canSubmit}
           >
             Submit Leave Request
           </Button>
