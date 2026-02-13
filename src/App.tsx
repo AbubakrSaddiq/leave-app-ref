@@ -19,8 +19,7 @@ const MainContent = () => {
         {profile && <DashboardTabs role={profile.role} />}
       </Container>
       
-      {/* Check and prompt for desired months if not submitted */}
-      <DesiredMonthsChecker />
+    
     </>
   );
 };

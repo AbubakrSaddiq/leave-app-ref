@@ -25,8 +25,10 @@ import {
   Spinner,
   Badge,
   Icon,
+  Link,
+  useDisclosure,
 } from "@chakra-ui/react";
-import { FiAlertTriangle, FiCheckCircle } from "react-icons/fi";
+import { FiAlertTriangle, FiCheckCircle, FiCalendar, FiEdit } from "react-icons/fi";
 import { useLeaveForm } from "@/hooks/useLeaveForm";
 import { LEAVE_TYPE_OPTIONS } from "@/constants/leaveConstants";
 import { formatDisplayDate } from "@/utils/dateUtils";
@@ -34,9 +36,9 @@ import { format } from "date-fns";
 import { LeaveType } from "@/types/models";
 import { 
   useValidateLeaveDates, 
-  useHasSubmittedDesiredMonths,
   useMyDesiredMonths 
 } from "@/hooks/useDesiredLeaveMonths";
+import { DesiredLeaveMonthsForm } from "@/components/desiredMonths/DesiredLeaveMonthsForm";
 
 interface LeaveApplicationFormProps {
   onSuccess?: () => void;
@@ -47,6 +49,9 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
   onSuccess,
   onCancel,
 }) => {
+  // Modal control for desired months form
+  const { isOpen: isDesiredMonthsOpen, onOpen: onDesiredMonthsOpen, onClose: onDesiredMonthsClose } = useDisclosure();
+
   // Pulling everything from our custom hook
   const {
     form,
@@ -71,16 +76,16 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
   const leaveType = watch("leave_type");
   const startDate = watch("start_date");
 
-  // Check desired months submission status
-  const { data: hasSubmitted } = useHasSubmittedDesiredMonths();
-  const { data: desiredMonths } = useMyDesiredMonths();
+  // Check desired months
+  const { data: desiredMonths, refetch: refetchDesiredMonths } = useMyDesiredMonths();
 
   // Validate dates against desired months (only for annual leave)
   const shouldValidateDesiredMonths = 
     leaveType === LeaveType.ANNUAL && 
     !!startDate && 
     !!calculatedEndDate &&
-    !isCalculating;
+    !isCalculating &&
+    !!desiredMonths; // Only validate if months are submitted
 
   const {
     data: desiredMonthsValidation,
@@ -93,7 +98,7 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
 
   // Check if annual leave can be submitted
   const isAnnualLeaveBlocked = 
-    leaveType === LeaveType.ANNUAL && !hasSubmitted;
+    leaveType === LeaveType.ANNUAL && !desiredMonths;
 
   const isDesiredMonthsInvalid = 
     leaveType === LeaveType.ANNUAL && 
@@ -106,6 +111,12 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
     !!calculatedEndDate && 
     !isAnnualLeaveBlocked &&
     !isDesiredMonthsInvalid;
+
+  // Refetch desired months after modal closes
+  const handleDesiredMonthsClose = () => {
+    onDesiredMonthsClose();
+    refetchDesiredMonths(); // Refresh to show newly submitted months
+  };
 
   return (
     <Box
@@ -145,26 +156,50 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
           )}
         </FormControl>
 
-        {/* Annual Leave - Desired Months Not Submitted */}
+        {/* Annual Leave - Desired Months Required (WITH LINK TO OPEN MODAL) */}
         {isAnnualLeaveBlocked && (
-          <Alert status="error" borderRadius="md">
+          <Alert status="warning" borderRadius="md" variant="left-accent">
             <AlertIcon />
             <Box flex="1">
-              <AlertTitle>Desired Months Required</AlertTitle>
-              <AlertDescription>
-                You must submit your desired leave months before applying for annual
-                leave. Please complete the desired months form first.
+              <AlertTitle>Desired Leave Months Required</AlertTitle>
+              <AlertDescription fontSize="sm" mt={2}>
+                Before applying for annual leave, you need to select your 2 desired leave months.
+                <br />
+                <Link
+                  color="blue.600"
+                  fontWeight="bold"
+                  onClick={onDesiredMonthsOpen}
+                  cursor="pointer"
+                  textDecoration="underline"
+                  _hover={{ color: "blue.800" }}
+                  mt={2}
+                  display="inline-flex"
+                  alignItems="center"
+                  gap={2}
+                >
+                  <Icon as={FiCalendar} />
+                  Click here to select your desired months
+                </Link>
               </AlertDescription>
             </Box>
           </Alert>
         )}
 
-        {/* Show desired months info for annual leave */}
+        {/* Show desired months info for annual leave (WITH EDIT OPTION IF NEEDED) */}
         {leaveType === LeaveType.ANNUAL && desiredMonths && (
           <Alert status="info" borderRadius="md" variant="left-accent">
             <AlertIcon />
             <Box flex="1">
-              <AlertTitle fontSize="sm">Your Desired Leave Months</AlertTitle>
+              <HStack justify="space-between" mb={2}>
+                <AlertTitle fontSize="sm">Your Desired Leave Months</AlertTitle>
+                {/* Optional: Allow viewing (but not editing since it's locked) */}
+                <Badge colorScheme="green" fontSize="xs">
+                  <HStack spacing={1}>
+                    <Icon as={FiCheckCircle} boxSize={3} />
+                    <Text>Submitted</Text>
+                  </HStack>
+                </Badge>
+              </HStack>
               <AlertDescription fontSize="sm" mt={2}>
                 <HStack spacing={2} flexWrap="wrap">
                   {desiredMonths.preferred_months.map((monthNum) => {
@@ -173,7 +208,7 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
                     ];
                     return (
-                      <Badge key={monthNum} colorScheme="blue" fontSize="xs">
+                      <Badge key={monthNum} colorScheme="blue" fontSize="xs" px={2} py={1}>
                         {monthNames[monthNum - 1]}
                       </Badge>
                     );
@@ -380,6 +415,13 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
           </Button>
         </HStack>
       </VStack>
+
+      {/* Desired Months Modal - Opens when user clicks link */}
+      <DesiredLeaveMonthsForm
+        isOpen={isDesiredMonthsOpen}
+        onClose={handleDesiredMonthsClose}
+        canClose={true} // User can close this since it's on-demand
+      />
     </Box>
   );
 };

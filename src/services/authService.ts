@@ -12,11 +12,14 @@ export const authService = {
       .from("users")
       .select("*, department:departments!department_id(*)")
       .eq("id", user.id)
-      .single();
+      .maybeSingle(); // Changed .single() to .maybeSingle() to prevent errors if row is missing
 
-    if (error) throw error;
-    console.error("Supabase error fetching profile:", error);
-    return data;
+    if (error) {
+      console.error("Supabase error fetching profile:", error.message);
+      throw error;
+    }
+
+    return data as Profile;
   },
 
   async signOut() {

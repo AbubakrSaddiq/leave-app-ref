@@ -52,7 +52,7 @@ interface DesiredLeaveMonthsFormProps {
 export const DesiredLeaveMonthsForm: React.FC<DesiredLeaveMonthsFormProps> = ({
   isOpen,
   onClose,
-  canClose = false,
+  canClose = true, // DEFAULT CHANGED TO TRUE
 }) => {
   const [selectedMonths, setSelectedMonths] = useState<number[]>([]);
   const submitMutation = useSubmitDesiredMonths();

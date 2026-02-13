@@ -35,21 +35,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     
     // Listen for auth changes (login/logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event);
-      
-      // Clear all React Query cache on auth change
-      if (event === 'SIGNED_OUT') {
-        console.log('User signed out - clearing all cache');
-        queryClient.clear(); // Nuclear option: clear everything
-        setProfile(null);
-      } else if (event === 'SIGNED_IN') {
-        console.log('User signed in - clearing cache and reloading profile');
-        queryClient.clear(); // Clear cache to prevent cross-user data
-        await loadProfile();
-      } else if (event === 'TOKEN_REFRESHED') {
-        // Token refresh doesn't need cache clear, just profile update
-        await loadProfile();
-      }
+     loadProfile();
     });
     
     return () => subscription.unsubscribe();
