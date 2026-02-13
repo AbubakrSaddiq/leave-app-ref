@@ -26,4 +26,30 @@ export const LEAVE_TYPE_OPTIONS = [
     label: "Paternity Leave",
     description: "14 days - 14 days notice",
   },
+  {
+    value: LeaveType.STUDY,
+    label: "Study Leave",
+    description: "BSc (4 years), MSc (2 years), PhD (4 years) ",
+  },
+];
+
+export const STUDY_PROGRAMS = [
+  {
+    value: 'bsc',
+    label: 'Bachelor of Science (BSc)',
+    duration: '4 years',
+    durationYears: 4,
+  },
+  {
+    value: 'msc',
+    label: 'Master of Science (MSc)',
+    duration: '2 years',
+    durationYears: 2,
+  },
+  {
+    value: 'phd',
+    label: 'Doctor of Philosophy (PhD)',
+    duration: '4 years',
+    durationYears: 4,
+  },
 ];

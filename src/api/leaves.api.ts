@@ -75,6 +75,7 @@ export async function getLeaveApplications(params?: {
       sort_order = 'desc',
     } = params || {};
 
+    
     console.log('Fetching leave applications with params:', params);
 
     // Build query - FETCH USER DATA WITH DEPARTMENT
@@ -212,11 +213,17 @@ export async function createLeaveApplication(params: {
   end_date: string;
   working_days: number;
   reason: string;
+  study_program?: 'bsc' | 'msc' | 'phd';
 }): Promise<LeaveApplication> {
   try {
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) throw new Error('Not authenticated');
 
+      // Validate study leave has program
+    if (params.leave_type === 'study' && !params.study_program) {
+      throw new Error('Study program is required for study leave');
+    }
+    
     // 1. Get user role to determine the starting status
     const { data: userProfile } = await supabase
       .from('users')
@@ -230,21 +237,27 @@ export async function createLeaveApplication(params: {
       initialStatus = 'pending_hr';
     }
 
+        // Build insert data
+    const insertData: any = {
+      user_id: authUser.id,
+      leave_type: params.leave_type,
+      start_date: params.start_date,
+      end_date: params.end_date,
+      working_days: params.working_days,
+      reason: params.reason,
+      status: initialStatus,
+      submitted_at: new Date().toISOString(),
+    };
+
+      // Add study_program for study leave
+    if (params.leave_type === 'study' && params.study_program) {
+      insertData.study_program = params.study_program;
+    }
+
     // 3. Perform the Insert with the literal selection string
-    const { data, error } = await supabase
+      const { data, error } = await supabase
       .from('leave_applications')
-      .insert([
-        {
-          user_id: authUser.id,
-          leave_type: params.leave_type,
-          start_date: params.start_date,
-          end_date: params.end_date,
-          working_days: params.working_days,
-          reason: params.reason,
-          status: initialStatus,
-          submitted_at: new Date().toISOString(),
-        },
-      ])
+      .insert([insertData])
       .select(`
         *,
         user:users!leave_applications_user_id_fkey (

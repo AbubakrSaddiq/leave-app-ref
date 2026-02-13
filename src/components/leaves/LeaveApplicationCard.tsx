@@ -7,6 +7,8 @@ import { FiUser, FiCalendar, FiMapPin, FiClock } from "react-icons/fi";
 import { formatDisplayDate, calculateResumptionDate } from "@/utils/dateUtils";
 import type { LeaveApplication, LeaveStatus, LeaveType } from "@/types/models";
 import { ApprovalModal } from "./ApprovalModal";
+import { STUDY_PROGRAMS } from "@/constants/leaveConstants";
+
 
 interface LeaveApplicationCardProps {
   application: LeaveApplication;
@@ -58,7 +60,16 @@ export const LeaveApplicationCard: React.FC<LeaveApplicationCardProps> = ({
               </Badge>
             </HStack>
             <Text fontSize="xs" color="gray.400" fontFamily="mono">#{application.application_number}</Text>
+            {/* Study Program Badge (if study leave) */}
+          {application.leave_type === 'study' && application.study_program && (
+            <Badge colorScheme="purple" variant="subtle">
+              <Icon as={FiBook} mr={1} />
+              {STUDY_PROGRAMS.find(p => p.value === application.study_program)?.label}
+            </Badge>
+          )}
           </HStack>
+
+        
 
           {/* User Header */}
           <Box p={3} bg="gray.50" borderRadius="lg">
@@ -82,6 +93,23 @@ export const LeaveApplicationCard: React.FC<LeaveApplicationCardProps> = ({
               value={formatDisplayDate(calculateResumptionDate(application.end_date))} 
               color="green.600" 
             />
+                      {application.leave_type === 'study' ? (
+            <>
+              <DataPoint 
+                icon={FiCalendar} 
+                label="Program" 
+                value={STUDY_PROGRAMS.find(p => p.value === application.study_program)?.label || 'N/A'} 
+              />
+              <DataPoint 
+                icon={FiClock} 
+                label="Duration" 
+                value={STUDY_PROGRAMS.find(p => p.value === application.study_program)?.duration || 'N/A'} 
+                color="purple.600"
+              />
+            </>
+          ) : (
+            <DataPoint icon={FiClock} label="Duration" value={`${application.working_days} Days`} />
+          )}
           </Grid>
 
           {/* Application Reason */}

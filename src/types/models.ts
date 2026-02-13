@@ -20,6 +20,7 @@ export enum LeaveType {
   SICK = 'sick',
   MATERNITY = 'maternity',
   PATERNITY = 'paternity',
+   STUDY = 'study',
 }
 
 export enum LeaveStatus {
@@ -124,6 +125,7 @@ export interface LeaveApplication {
   updated_at: string;
   user?: User;
   director?: User;
+  study_program?: 'bsc' | 'msc' | 'phd'; 
 }
 
 export interface PublicHoliday {
@@ -158,6 +160,7 @@ export interface CreateLeaveApplicationDto {
   end_date: string;
   reason: string;
   working_days: number;
+  study_program?: 'bsc' | 'msc' | 'phd';
 }
 
 export interface ApprovalActionDto {
