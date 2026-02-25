@@ -59,7 +59,7 @@ export const UserForm: React.FC<UserFormProps> = ({
     password: DEFAULT_PASSWORD,
     role: user?.role || "staff",
     department_id: user?.department_id || "",
-    designation_id: user?.designation_id || "", // UPDATED: Added designation
+    designation_id: user?.designation_id || "", 
   });
 
   // Fetch designations
@@ -89,7 +89,7 @@ export const UserForm: React.FC<UserFormProps> = ({
         password: DEFAULT_PASSWORD,
         role: "staff",
         department_id: "",
-        designation_id: "", // UPDATED: Reset designation
+        designation_id: "", 
       });
       setShowPassword(false);
     } else if (isOpen && user) {
@@ -100,7 +100,7 @@ export const UserForm: React.FC<UserFormProps> = ({
         password: "",
         role: user.role || "staff",
         department_id: user.department_id || "",
-        designation_id: user.designation_id || "", // UPDATED: Populate designation
+        designation_id: user.designation_id || "", 
       });
     }
   }, [isOpen, user]);
@@ -140,7 +140,7 @@ export const UserForm: React.FC<UserFormProps> = ({
             full_name: formData.full_name,
             role: formData.role,
             department_id: formData.department_id || null,
-            designation_id: formData.designation_id || null, // UPDATED: Include designation
+            designation_id: formData.designation_id || null, 
           })
           .eq("id", user.id);
 
@@ -155,8 +155,8 @@ export const UserForm: React.FC<UserFormProps> = ({
             user_metadata: {
               full_name: formData.full_name,
               role: formData.role,
-              department_id: formData.department_id,
-              designation_id: formData.designation_id, // UPDATED: Include designation
+              department_id: formData.department_id || null,
+              designation_id: formData.designation_id || null, 
             },
           },
         });

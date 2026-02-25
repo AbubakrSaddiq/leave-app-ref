@@ -98,6 +98,20 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
 
   const currentBalance = balanceData?.balances.find(b => b.leave_type === leaveType);
 
+  // ── RESET form when leave type changes ────────────────────────────────────
+  useEffect(() => {
+    setWorkingDays(1);
+    setCalculatedEndDate("");
+    setResumptionDate("");
+    setValue("working_days", 1);
+    setValue("end_date", "");
+    
+    // Clear study_program when not study leave
+    if (leaveType !== LeaveType.STUDY) {
+      setValue("study_program", undefined);
+    }
+  }, [leaveType, setValue]);
+  
   // Calculate end date for regular leave types
   useEffect(() => {
     if (leaveType === LeaveType.STUDY) {

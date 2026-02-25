@@ -1,196 +1,123 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
+// supabase/functions/admin-create-user/index.ts
+import { createClient } from 'jsr:@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
 
 Deno.serve(async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders, status: 200 })
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log('🚀 Starting user creation...')
-    
-    // Parse request body
-    const { email, password, user_metadata } = await req.json()
-    console.log('📧 Email:', email)
-    console.log('👤 User metadata:', user_metadata)
-
-    // Validate required fields
-    if (!email || !password) {
-      throw new Error('Email and password are required')
-    }
-
-    // Create Supabase Admin Client
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { 
-        auth: { 
-          autoRefreshToken: false, 
-          persistSession: false 
-        } 
-      }
-    )
-
-    // Get the Authorization header
+    // Get the authorization header
     const authHeader = req.headers.get('Authorization')
     if (!authHeader) {
-      console.error('❌ No Authorization header')
       throw new Error('Missing authorization header')
     }
 
-    // Extract token
-    const token = authHeader.replace('Bearer ', '')
-    
-    // Verify the caller
-    const { data: { user: caller }, error: authError } = await supabaseAdmin.auth.getUser(token)
-    
-    if (authError || !caller) {
-      console.error('❌ Auth verification failed:', authError?.message)
-      throw new Error('Unauthorized: Invalid authentication token')
+    // Create a Supabase client with the user's JWT (to verify role)
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      { global: { headers: { Authorization: authHeader } } }
+    )
+
+    // Get the user from the JWT
+    const {
+      data: { user: caller },
+      error: userError,
+    } = await supabaseClient.auth.getUser()
+    if (userError || !caller) {
+      throw new Error('Invalid user token')
     }
 
-    console.log('✅ Caller authenticated:', caller.id)
-
-    // Get caller's profile and role
-    const { data: callerProfile, error: profileError } = await supabaseAdmin
+    // Fetch the caller's role from the `users` table (or use JWT claims if you store role there)
+    const { data: callerProfile, error: profileError } = await supabaseClient
       .from('users')
-      .select('role, full_name, email')
+      .select('role')
       .eq('id', caller.id)
       .single()
 
     if (profileError || !callerProfile) {
-      console.error('❌ Profile fetch failed:', profileError?.message)
-      throw new Error('User profile not found')
+      throw new Error('Could not verify user role')
     }
 
-    console.log('👔 Caller:', callerProfile.full_name, '(' + callerProfile.role + ')')
-
-    // 🔥 CHECK AUTHORIZATION: Allow ADMIN or HR
-    if (!['admin', 'hr'].includes(callerProfile.role)) {
-      console.error('❌ Unauthorized role:', callerProfile.role)
-      throw new Error(`Access denied. Only Admin and HR can create users. Your role: ${callerProfile.role}`)
+    const allowedRoles = ['hr', 'admin']
+    if (!allowedRoles.includes(callerProfile.role)) {
+      throw new Error('Forbidden: Only HR or Admin can create users')
     }
 
-    console.log('✅ Authorization passed - proceeding with user creation')
+    // Parse request body
+    const { email, password, user_metadata } = await req.json()
+    if (!email || !password || !user_metadata?.full_name) {
+      throw new Error('Missing required fields: email, password, full_name')
+    }
 
-    // Create the new user in auth.users
-    const { data: newAuthUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    // Create a Supabase admin client (service role) for privileged operations
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } }
+    )
+
+    // 1. Create the user in auth.users
+    const { data: authUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Auto-confirm email
-      user_metadata: user_metadata || {},
+      email_confirm: true, // Auto-confirm email (or set to false if you want verification)
+      user_metadata: {
+        full_name: user_metadata.full_name,
+        role: user_metadata.role || 'staff',
+      },
     })
 
     if (createError) {
-      console.error('❌ User creation failed:', createError.message)
-      throw new Error(`Failed to create user: ${createError.message}`)
+      console.error('Auth creation error:', createError)
+      throw new Error(`Failed to create auth user: ${createError.message}`)
     }
 
-    console.log('✅ Auth user created:', newAuthUser.user.id)
+    if (!authUser.user) {
+      throw new Error('Auth user creation returned no user')
+    }
 
-    // Wait for database trigger to create user record
-    console.log('⏳ Waiting for trigger to create user record...')
-    await new Promise(resolve => setTimeout(resolve, 2500))
-
-    // Update the user profile in public.users table
-    if (user_metadata) {
-      console.log('📝 Updating user profile...')
-      
-      const updateData = {
+    // 2. Insert the corresponding profile into public.users
+    const { error: insertError } = await supabaseAdmin
+      .from('users')
+      .insert({
+        id: authUser.user.id, // Same ID as auth.users
+        email: authUser.user.email!,
         full_name: user_metadata.full_name,
-        role: user_metadata.role,
+        role: user_metadata.role || 'staff',
         department_id: user_metadata.department_id || null,
         designation_id: user_metadata.designation_id || null,
         is_active: true,
-      }
+      })
 
-      const { data: updatedUser, error: updateError } = await supabaseAdmin
-        .from('users')
-        .update(updateData)
-        .eq('id', newAuthUser.user.id)
-        .select()
-        .single()
-
-      if (updateError) {
-        console.warn('⚠️ Update failed, attempting manual insert:', updateError.message)
-        
-        // If update failed, try manual insert
-        const { data: insertedUser, error: insertError } = await supabaseAdmin
-          .from('users')
-          .insert({
-            id: newAuthUser.user.id,
-            email: email,
-            ...updateData
-          })
-          .select()
-          .single()
-
-        if (insertError) {
-          console.error('❌ Manual insert also failed:', insertError.message)
-          throw new Error('User created in auth but profile setup failed')
-        }
-
-        console.log('✅ User profile created via manual insert')
-      } else {
-        console.log('✅ User profile updated successfully')
-      }
+    if (insertError) {
+      // If profile insert fails, clean up the auth user to avoid orphaned accounts
+      await supabaseAdmin.auth.admin.deleteUser(authUser.user.id)
+      console.error('Profile insert error:', insertError)
+      throw new Error(`Failed to create user profile: ${insertError.message}`)
     }
 
-    // Allocate leave balances
-    console.log('📅 Allocating leave balances...')
-    
-    const { error: leaveError } = await supabaseAdmin.rpc('allocate_leave_for_user', {
-      p_user_id: newAuthUser.user.id,
-      p_year: new Date().getFullYear(),
-      p_hire_date: null,
-    })
-
-    if (leaveError) {
-      console.warn('⚠️ Leave allocation failed:', leaveError.message)
-      // Don't throw - user is created, allocation can be done manually
-    } else {
-      console.log('✅ Leave balances allocated')
-    }
-
-    console.log('🎉 User creation completed successfully!')
-
-    // Return success response
+    // 3. Return success
     return new Response(
-      JSON.stringify({ 
-        success: true,
+      JSON.stringify({
         message: 'User created successfully',
         user: {
-          id: newAuthUser.user.id,
-          email: newAuthUser.user.email,
+          id: authUser.user.id,
+          email: authUser.user.email,
         },
-        created_by: {
-          name: callerProfile.full_name,
-          email: callerProfile.email,
-          role: callerProfile.role,
-        }
-      }), 
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200,
       }
     )
-
-  } catch (error: any) {
-    console.error('💥 ERROR:', error.message)
-    console.error('Stack trace:', error.stack)
-    
+  } catch (err) {
+    console.error('Edge function error:', err)
     return new Response(
-      JSON.stringify({ 
-        success: false,
-        error: error.message || 'An unexpected error occurred',
-        timestamp: new Date().toISOString(),
-      }), 
+      JSON.stringify({ error: err instanceof Error ? err.message : 'Unknown error' }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400,
