@@ -1,127 +1,155 @@
-// supabase/functions/admin-create-user/index.ts
-import { createClient } from 'jsr:@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
 
-Deno.serve(async (req: Request) => {
-  // Handle CORS preflight
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
+};
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+      },
+    });
   }
 
   try {
-    // Get the authorization header
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader) {
-      throw new Error('Missing authorization header')
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader?.startsWith("Bearer ")) {
+      return new Response(
+        JSON.stringify({ error: "Missing or malformed Authorization header" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    // Create a Supabase client with the user's JWT (to verify role)
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: authHeader } } }
-    )
+    const token = authHeader.replace("Bearer ", "");
 
-    // Get the user from the JWT
-    const {
-      data: { user: caller },
-      error: userError,
-    } = await supabaseClient.auth.getUser()
-    if (userError || !caller) {
-      throw new Error('Invalid user token')
-    }
-
-    // Fetch the caller's role from the `users` table (or use JWT claims if you store role there)
-    const { data: callerProfile, error: profileError } = await supabaseClient
-      .from('users')
-      .select('role')
-      .eq('id', caller.id)
-      .single()
-
-    if (profileError || !callerProfile) {
-      throw new Error('Could not verify user role')
-    }
-
-    const allowedRoles = ['hr', 'admin']
-    if (!allowedRoles.includes(callerProfile.role)) {
-      throw new Error('Forbidden: Only HR or Admin can create users')
-    }
-
-    // Parse request body
-    const { email, password, user_metadata } = await req.json()
-    if (!email || !password || !user_metadata?.full_name) {
-      throw new Error('Missing required fields: email, password, full_name')
-    }
-
-    // Create a Supabase admin client (service role) for privileged operations
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    // ── Use service client to verify the token ──────────────────────────────
+    // getUser(token) validates the JWT server-side without needing a matching
+    // anon key — works regardless of how the session was created
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
       { auth: { persistSession: false } }
-    )
+    );
 
-    // 1. Create the user in auth.users
-    const { data: authUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    const { data: { user }, error: userError } = await serviceClient.auth.getUser(token);
+
+    console.log("Auth user:", user?.id, "Error:", userError?.message);
+
+    if (userError || !user) {
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid or expired token",
+          detail: userError?.message 
+        }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── Fetch caller's role using service client scoped to their ID ─────────
+    const { data: callerProfile, error: profileError } = await serviceClient
+      .from("users")
+      .select("role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    console.log("Caller profile:", callerProfile, "Error:", profileError?.message);
+
+    if (!callerProfile) {
+      return new Response(
+        JSON.stringify({
+          error: "Your profile was not found in public.users",
+          detail: profileError?.message ?? "No row returned",
+        }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const allowedRoles = ["admin", "hr"];
+    if (!allowedRoles.includes(callerProfile.role)) {
+      return new Response(
+        JSON.stringify({
+          error: "Forbidden: admin or hr role required",
+          your_role: callerProfile.role,
+        }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── Parse and validate body ─────────────────────────────────────────────
+    const {
       email,
       password,
-      email_confirm: true, // Auto-confirm email (or set to false if you want verification)
-      user_metadata: {
-        full_name: user_metadata.full_name,
-        role: user_metadata.role || 'staff',
-      },
-    })
+      full_name,
+      role = "staff",
+      department_id = null,
+      designation_id = null,
+    } = await req.json();
+
+    if (!email || !password || !full_name) {
+      return new Response(
+        JSON.stringify({ error: "email, password, and full_name are required" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const validRoles = ["staff", "director", "hr", "admin"];
+    if (!validRoles.includes(role)) {
+      return new Response(
+        JSON.stringify({ error: `Invalid role: ${role}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // ── Create user in auth.users — trigger populates public.users ──────────
+    const { data: newAuthUser, error: createError } =
+      await serviceClient.auth.admin.createUser({
+        email,
+        password,
+        email_confirm: true,
+        user_metadata: {
+          full_name,
+          role,
+          department_id,
+          designation_id,
+        },
+      });
+
+    console.log("Created auth user:", newAuthUser?.user?.id, "Error:", createError?.message);
 
     if (createError) {
-      console.error('Auth creation error:', createError)
-      throw new Error(`Failed to create auth user: ${createError.message}`)
+      return new Response(
+        JSON.stringify({ error: createError.message }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
-    if (!authUser.user) {
-      throw new Error('Auth user creation returned no user')
-    }
+    // ── Fetch the new public profile ────────────────────────────────────────
+    const { data: publicProfile } = await serviceClient
+      .from("users")
+      .select("*")
+      .eq("id", newAuthUser.user!.id)
+      .maybeSingle();
 
-    // 2. Insert the corresponding profile into public.users
-    const { error: insertError } = await supabaseAdmin
-      .from('users')
-      .insert({
-        id: authUser.user.id, // Same ID as auth.users
-        email: authUser.user.email!,
-        full_name: user_metadata.full_name,
-        role: user_metadata.role || 'staff',
-        department_id: user_metadata.department_id || null,
-        designation_id: user_metadata.designation_id || null,
-        is_active: true,
-      })
-
-    if (insertError) {
-      // If profile insert fails, clean up the auth user to avoid orphaned accounts
-      await supabaseAdmin.auth.admin.deleteUser(authUser.user.id)
-      console.error('Profile insert error:', insertError)
-      throw new Error(`Failed to create user profile: ${insertError.message}`)
-    }
-
-    // 3. Return success
     return new Response(
       JSON.stringify({
-        message: 'User created successfully',
-        user: {
-          id: authUser.user.id,
-          email: authUser.user.email,
-        },
+        user: publicProfile ?? newAuthUser.user,
+        message: "User created successfully",
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      }
-    )
-  } catch (err) {
-    console.error('Edge function error:', err)
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Unexpected server error";
+    console.error("Unhandled error:", message);
     return new Response(
-      JSON.stringify({ error: err instanceof Error ? err.message : 'Unknown error' }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      }
-    )
+      JSON.stringify({ error: message }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
-})
+});

@@ -1,12 +1,45 @@
 import React, { useState, useEffect } from "react";
 import {
-  Modal, ModalOverlay, ModalContent, ModalHeader, ModalFooter,
-  ModalBody, ModalCloseButton, Button, FormControl, FormLabel,
-  Input, Select, VStack, useToast, InputGroup, InputLeftElement,
-  Icon, Text, Box, HStack, RadioGroup, Radio, Stack, InputRightElement,
-  IconButton, Tooltip, Badge
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalFooter,
+  ModalBody,
+  ModalCloseButton,
+  Button,
+  FormControl,
+  FormLabel,
+  Input,
+  Select,
+  VStack,
+  useToast,
+  InputGroup,
+  InputLeftElement,
+  Icon,
+  Text,
+  Box,
+  HStack,
+  RadioGroup,
+  Radio,
+  Stack,
+  InputRightElement,
+  IconButton,
+  Tooltip,
+  Badge,
 } from "@chakra-ui/react";
-import { FiUser, FiMail, FiLock, FiShield, FiBriefcase, FiAward, FiRefreshCw, FiCopy, FiEye, FiEyeOff } from "react-icons/fi";
+import {
+  FiUser,
+  FiMail,
+  FiLock,
+  FiShield,
+  FiBriefcase,
+  FiAward,
+  FiRefreshCw,
+  FiCopy,
+  FiEye,
+  FiEyeOff,
+} from "react-icons/fi";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { getDesignations } from "@/api/designation.api";
@@ -28,18 +61,21 @@ const generateSecurePassword = (): string => {
   const numbers = "0123456789";
   const symbols = "!@#$%^&*";
   const allChars = uppercase + lowercase + numbers + symbols;
-  
+
   let password = "";
   password += uppercase[Math.floor(Math.random() * uppercase.length)];
   password += lowercase[Math.floor(Math.random() * lowercase.length)];
   password += numbers[Math.floor(Math.random() * numbers.length)];
   password += symbols[Math.floor(Math.random() * symbols.length)];
-  
+
   for (let i = password.length; i < length; i++) {
     password += allChars[Math.floor(Math.random() * allChars.length)];
   }
-  
-  return password.split('').sort(() => Math.random() - 0.5).join('');
+
+  return password
+    .split("")
+    .sort(() => Math.random() - 0.5)
+    .join("");
 };
 
 export const UserForm: React.FC<UserFormProps> = ({
@@ -51,7 +87,9 @@ export const UserForm: React.FC<UserFormProps> = ({
 }) => {
   const toast = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [passwordOption, setPasswordOption] = useState<"default" | "auto">("default");
+  const [passwordOption, setPasswordOption] = useState<"default" | "auto">(
+    "default",
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: user?.email || "",
@@ -59,7 +97,7 @@ export const UserForm: React.FC<UserFormProps> = ({
     password: DEFAULT_PASSWORD,
     role: user?.role || "staff",
     department_id: user?.department_id || "",
-    designation_id: user?.designation_id || "", 
+    designation_id: user?.designation_id || "",
   });
 
   // Fetch designations
@@ -72,9 +110,12 @@ export const UserForm: React.FC<UserFormProps> = ({
   useEffect(() => {
     if (!user) {
       if (passwordOption === "default") {
-        setFormData(prev => ({ ...prev, password: DEFAULT_PASSWORD }));
+        setFormData((prev) => ({ ...prev, password: DEFAULT_PASSWORD }));
       } else {
-        setFormData(prev => ({ ...prev, password: generateSecurePassword() }));
+        setFormData((prev) => ({
+          ...prev,
+          password: generateSecurePassword(),
+        }));
       }
     }
   }, [passwordOption, user]);
@@ -89,7 +130,7 @@ export const UserForm: React.FC<UserFormProps> = ({
         password: DEFAULT_PASSWORD,
         role: "staff",
         department_id: "",
-        designation_id: "", 
+        designation_id: "",
       });
       setShowPassword(false);
     } else if (isOpen && user) {
@@ -100,14 +141,14 @@ export const UserForm: React.FC<UserFormProps> = ({
         password: "",
         role: user.role || "staff",
         department_id: user.department_id || "",
-        designation_id: user.designation_id || "", 
+        designation_id: user.designation_id || "",
       });
     }
   }, [isOpen, user]);
 
   const handleRegeneratePassword = () => {
     const newPassword = generateSecurePassword();
-    setFormData(prev => ({ ...prev, password: newPassword }));
+    setFormData((prev) => ({ ...prev, password: newPassword }));
     toast({
       title: "Password regenerated",
       status: "success",
@@ -129,6 +170,20 @@ export const UserForm: React.FC<UserFormProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // TEMPORARY DEBUG
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
+    console.log("Full session:", session);
+    console.log("Session error:", error);
+    console.log(
+      "LocalStorage keys:",
+      Object.keys(localStorage).filter((k) => k.includes("supabase")),
+    );
+    // END DEBUG
+
     setIsSubmitting(true);
 
     try {
@@ -140,7 +195,7 @@ export const UserForm: React.FC<UserFormProps> = ({
             full_name: formData.full_name,
             role: formData.role,
             department_id: formData.department_id || null,
-            designation_id: formData.designation_id || null, 
+            designation_id: formData.designation_id || null,
           })
           .eq("id", user.id);
 
@@ -148,37 +203,63 @@ export const UserForm: React.FC<UserFormProps> = ({
         toast({ title: "User updated successfully", status: "success" });
       } else {
         // CREATE MODE
-        const { data, error } = await supabase.functions.invoke("admin-create-user", {
-          body: {
-            email: formData.email,
-            password: formData.password,
-            user_metadata: {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+
+        if (!session) {
+          throw new Error("No active session — please log out and log back in");
+        }
+
+        console.log("Sending token:", session.access_token.substring(0, 20)); // debug
+
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-create-user`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${session.access_token}`,
+              apikey: import.meta.env.VITE_SUPABASE_ANON_KEY,
+            },
+            body: JSON.stringify({
+              email: formData.email,
+              password: formData.password,
               full_name: formData.full_name,
               role: formData.role,
               department_id: formData.department_id || null,
-              designation_id: formData.designation_id || null, 
-            },
+              designation_id: formData.designation_id || null,
+            }),
           },
-        });
+        );
 
-        if (error) throw error;
-        
+        const data = await response.json();
+        console.log("Response status:", response.status, "Data:", data); // debug
+
+        if (!response.ok)
+          throw new Error(data.error ?? "Failed to create user");
+
         toast({
           title: "User created successfully",
-          description: passwordOption === "auto" 
-            ? "Generated password has been copied to clipboard" 
-            : "Default password assigned",
+          description:
+            passwordOption === "auto"
+              ? "Generated password has been copied to clipboard"
+              : "Default password assigned",
           status: "success",
           duration: 5000,
           isClosable: true,
         });
-        
+
         navigator.clipboard.writeText(formData.password);
       }
       onSuccess();
       onClose();
     } catch (err: any) {
-      toast({ title: "Operation failed", description: err.message, status: "error" });
+      toast({
+        title: "Operation failed",
+        description: err.message,
+        status: "error",
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -193,44 +274,61 @@ export const UserForm: React.FC<UserFormProps> = ({
             {user ? "Edit Staff Member" : "Register New Staff"}
           </ModalHeader>
           <ModalCloseButton />
-          
+
           <ModalBody py={6}>
             <VStack spacing={4}>
               <FormControl isRequired isDisabled={!!user}>
-                <FormLabel fontSize="xs" fontWeight="bold">Email Address</FormLabel>
+                <FormLabel fontSize="xs" fontWeight="bold">
+                  Email Address
+                </FormLabel>
                 <InputGroup>
-                  <InputLeftElement children={<Icon as={FiMail} color="gray.400" />} />
-                  <Input 
-                    type="email" 
+                  <InputLeftElement
+                    children={<Icon as={FiMail} color="gray.400" />}
+                  />
+                  <Input
+                    type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({...formData, email: e.target.value})}
-                    placeholder="name@company.com" 
+                    onChange={(e) =>
+                      setFormData({ ...formData, email: e.target.value })
+                    }
+                    placeholder="name@company.com"
                   />
                 </InputGroup>
               </FormControl>
 
               {!user && (
                 <FormControl isRequired>
-                  <FormLabel fontSize="xs" fontWeight="bold">Password Option</FormLabel>
-                  <RadioGroup value={passwordOption} onChange={(val) => setPasswordOption(val as "default" | "auto")}>
+                  <FormLabel fontSize="xs" fontWeight="bold">
+                    Password Option
+                  </FormLabel>
+                  <RadioGroup
+                    value={passwordOption}
+                    onChange={(val) =>
+                      setPasswordOption(val as "default" | "auto")
+                    }
+                  >
                     <Stack direction="row" spacing={6}>
                       <Radio value="default" colorScheme="blue">
                         <HStack spacing={2}>
                           <Text fontSize="sm">Default Password</Text>
-                          <Badge colorScheme="blue" fontSize="10px">Naseni123!</Badge>
+                          <Badge colorScheme="blue" fontSize="10px">
+                            Naseni123!
+                          </Badge>
                         </HStack>
                       </Radio>
                       <Radio value="auto" colorScheme="green">
                         <HStack spacing={2}>
                           <Text fontSize="sm">Auto-Generate</Text>
-                          <Badge colorScheme="green" fontSize="10px">Secure</Badge>
+                          <Badge colorScheme="green" fontSize="10px">
+                            Secure
+                          </Badge>
                         </HStack>
                       </Radio>
                     </Stack>
                   </RadioGroup>
                   <Text fontSize="xs" color="gray.500" mt={2}>
-                    {passwordOption === "default" 
-                      ? "Uses the standard temporary password for new users" 
+                    {passwordOption === "default"
+                      ? "Uses the standard temporary password for new users"
                       : "Generates a strong random password (12+ characters)"}
                   </Text>
                 </FormControl>
@@ -239,11 +337,15 @@ export const UserForm: React.FC<UserFormProps> = ({
               {!user && (
                 <FormControl isRequired>
                   <FormLabel fontSize="xs" fontWeight="bold">
-                    {passwordOption === "default" ? "Default Password" : "Generated Password"}
+                    {passwordOption === "default"
+                      ? "Default Password"
+                      : "Generated Password"}
                   </FormLabel>
                   <InputGroup>
-                    <InputLeftElement children={<Icon as={FiLock} color="gray.400" />} />
-                    <Input 
+                    <InputLeftElement
+                      children={<Icon as={FiLock} color="gray.400" />}
+                    />
+                    <Input
                       type={showPassword ? "text" : "password"}
                       value={formData.password}
                       readOnly
@@ -274,7 +376,9 @@ export const UserForm: React.FC<UserFormProps> = ({
                           />
                         </Tooltip>
                         <IconButton
-                          aria-label={showPassword ? "Hide password" : "Show password"}
+                          aria-label={
+                            showPassword ? "Hide password" : "Show password"
+                          }
                           icon={showPassword ? <FiEyeOff /> : <FiEye />}
                           size="xs"
                           variant="ghost"
@@ -283,33 +387,50 @@ export const UserForm: React.FC<UserFormProps> = ({
                       </HStack>
                     </InputRightElement>
                   </InputGroup>
-                  <Text fontSize="xs" color="orange.600" mt={1} fontWeight="medium">
+                  <Text
+                    fontSize="xs"
+                    color="orange.600"
+                    mt={1}
+                    fontWeight="medium"
+                  >
                     ⚠️ Password will be copied to clipboard on user creation
                   </Text>
                 </FormControl>
               )}
 
               <FormControl isRequired>
-                <FormLabel fontSize="xs" fontWeight="bold">Full Name</FormLabel>
+                <FormLabel fontSize="xs" fontWeight="bold">
+                  Full Name
+                </FormLabel>
                 <InputGroup>
-                  <InputLeftElement children={<Icon as={FiUser} color="gray.400" />} />
-                  <Input 
+                  <InputLeftElement
+                    children={<Icon as={FiUser} color="gray.400" />}
+                  />
+                  <Input
                     value={formData.full_name}
-                    onChange={(e) => setFormData({...formData, full_name: e.target.value})}
-                    placeholder="e.g. Jane Doe" 
+                    onChange={(e) =>
+                      setFormData({ ...formData, full_name: e.target.value })
+                    }
+                    placeholder="e.g. Jane Doe"
                   />
                 </InputGroup>
               </FormControl>
 
               <HStack width="full" spacing={4}>
                 <FormControl isRequired>
-                  <FormLabel fontSize="xs" fontWeight="bold">Access Role</FormLabel>
+                  <FormLabel fontSize="xs" fontWeight="bold">
+                    Access Role
+                  </FormLabel>
                   <InputGroup>
-                    <InputLeftElement children={<Icon as={FiShield} color="gray.400" />} />
-                    <Select 
+                    <InputLeftElement
+                      children={<Icon as={FiShield} color="gray.400" />}
+                    />
+                    <Select
                       pl="40px"
                       value={formData.role}
-                      onChange={(e) => setFormData({...formData, role: e.target.value})}
+                      onChange={(e) =>
+                        setFormData({ ...formData, role: e.target.value })
+                      }
                     >
                       <option value="staff">Staff</option>
                       <option value="director">Director</option>
@@ -320,37 +441,59 @@ export const UserForm: React.FC<UserFormProps> = ({
                 </FormControl>
 
                 <FormControl>
-                  <FormLabel fontSize="xs" fontWeight="bold">Department</FormLabel>
+                  <FormLabel fontSize="xs" fontWeight="bold">
+                    Department
+                  </FormLabel>
                   <InputGroup>
-                    <InputLeftElement children={<Icon as={FiBriefcase} color="gray.400" />} />
-                    <Select 
+                    <InputLeftElement
+                      children={<Icon as={FiBriefcase} color="gray.400" />}
+                    />
+                    <Select
                       pl="40px"
                       value={formData.department_id}
-                      onChange={(e) => setFormData({...formData, department_id: e.target.value})}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          department_id: e.target.value,
+                        })
+                      }
                       placeholder="Unassigned"
                     >
-                      {departments.map(d => (
-                        <option key={d.id} value={d.id}>{d.code}</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.code}
+                        </option>
                       ))}
                     </Select>
                   </InputGroup>
                 </FormControl>
               </HStack>
 
-              {/* UPDATED: Added Designation Field */}
+              {/* Added Designation Field */}
               <FormControl>
-                <FormLabel fontSize="xs" fontWeight="bold">Designation</FormLabel>
+                <FormLabel fontSize="xs" fontWeight="bold">
+                  Designation
+                </FormLabel>
                 <InputGroup>
-                  <InputLeftElement children={<Icon as={FiAward} color="gray.400" />} />
-                  <Select 
+                  <InputLeftElement
+                    children={<Icon as={FiAward} color="gray.400" />}
+                  />
+                  <Select
                     pl="40px"
                     value={formData.designation_id}
-                    onChange={(e) => setFormData({...formData, designation_id: e.target.value})}
+                    onChange={(e) =>
+                      setFormData({
+                        ...formData,
+                        designation_id: e.target.value,
+                      })
+                    }
                     placeholder="Select designation"
                     isDisabled={loadingDesignations}
                   >
-                    {designations?.map(d => (
-                      <option key={d.id} value={d.id}>{d.name}</option>
+                    {designations?.map((d) => (
+                      <option key={d.id} value={d.id}>
+                        {d.name}
+                      </option>
                     ))}
                   </Select>
                 </InputGroup>
@@ -362,7 +505,9 @@ export const UserForm: React.FC<UserFormProps> = ({
           </ModalBody>
 
           <ModalFooter bg="gray.50" borderBottomRadius="xl">
-            <Button variant="ghost" mr={3} onClick={onClose}>Cancel</Button>
+            <Button variant="ghost" mr={3} onClick={onClose}>
+              Cancel
+            </Button>
             <Button colorScheme="blue" type="submit" isLoading={isSubmitting}>
               {user ? "Save Changes" : "Create Account"}
             </Button>
