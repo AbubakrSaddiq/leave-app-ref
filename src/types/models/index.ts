@@ -49,7 +49,7 @@ export interface User {
   full_name: string;
   role: UserRole;
   department_id: string | null;
-  hire_date: string;
+  // hire_date: string;
   is_active: boolean;
   avatar_url: string | null;
   created_at: string;

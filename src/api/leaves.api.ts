@@ -75,9 +75,6 @@ export async function getLeaveApplications(params?: {
       sort_order = 'desc',
     } = params || {};
 
-    
-    console.log('Fetching leave applications with params:', params);
-
     // Build query - FETCH USER DATA WITH DEPARTMENT
     let query = supabase
       .from('leave_applications')
@@ -142,9 +139,6 @@ export async function getLeaveApplications(params?: {
       console.error('Error fetching leave applications:', error);
       throw error;
     }
-
-    console.log('Fetched leave applications:', data);
-    console.log('First application user data:', data?.[0]?.user);
 
     return {
       data: data || [],

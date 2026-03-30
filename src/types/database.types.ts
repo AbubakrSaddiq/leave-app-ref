@@ -21,7 +21,7 @@ export interface Database {
           full_name: string
           role: 'staff' | 'director' | 'hr' | 'admin'
           department_id: string | null
-          hire_date: string
+          // hire_date: string
           is_active: boolean
           avatar_url: string | null
           created_at: string
@@ -33,7 +33,7 @@ export interface Database {
           full_name: string
           role?: 'staff' | 'director' | 'hr' | 'admin'
           department_id?: string | null
-          hire_date: string
+          // hire_date: string
           is_active?: boolean
           avatar_url?: string | null
           created_at?: string

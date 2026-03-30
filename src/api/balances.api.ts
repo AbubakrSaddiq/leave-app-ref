@@ -83,7 +83,7 @@ export const getLeaveBalanceByType = async (
 // ALLOCATE LEAVE (Admin Functions)
 // ============================================
 
-// FIX: removed p_hire_date — column does not exist in this schema
+
 export const allocateLeaveForUser = async (userId: string, year: number): Promise<void> => {
   const { error } = await supabase.rpc('allocate_leave_for_user', {
     p_user_id: userId,

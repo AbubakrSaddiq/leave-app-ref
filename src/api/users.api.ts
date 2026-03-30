@@ -242,7 +242,7 @@ export async function createUser(params: CreateUserParams): Promise<User> {
         const { error: allocError } = await supabase.rpc('allocate_leave_for_user', {
           p_user_id: authData.user.id,
           p_year: new Date().getFullYear(),
-          p_hire_date: null,
+          // p_hire_date: null,
         });
 
         if (allocError) {
@@ -260,7 +260,7 @@ export async function createUser(params: CreateUserParams): Promise<User> {
     const { error: allocError } = await supabase.rpc('allocate_leave_for_user', {
       p_user_id: authData.user.id,
       p_year: new Date().getFullYear(),
-      p_hire_date: null,
+      // p_hire_date: null,
     });
 
     if (allocError) {

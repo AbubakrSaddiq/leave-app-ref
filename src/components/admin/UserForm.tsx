@@ -171,19 +171,6 @@ export const UserForm: React.FC<UserFormProps> = ({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // TEMPORARY DEBUG
-    const {
-      data: { session },
-      error,
-    } = await supabase.auth.getSession();
-    console.log("Full session:", session);
-    console.log("Session error:", error);
-    console.log(
-      "LocalStorage keys:",
-      Object.keys(localStorage).filter((k) => k.includes("supabase")),
-    );
-    // END DEBUG
-
     setIsSubmitting(true);
 
     try {

@@ -2,7 +2,7 @@
 // Balance Card Component
 // ============================================
 
-import React from 'react';
+import React from "react";
 import {
   Box,
   Text,
@@ -11,23 +11,37 @@ import {
   VStack,
   Badge,
   Icon,
-} from '@chakra-ui/react';
-import { FiCalendar, FiClock, FiCheckCircle, FiAlertCircle } from 'react-icons/fi';
-import type { LeaveBalance, LeaveType } from '@/types/models';
+} from "@chakra-ui/react";
+import {
+  FiCalendar,
+  FiClock,
+  FiCheckCircle,
+  FiAlertCircle,
+  FiBook,
+} from "react-icons/fi";
+import type { LeaveBalance, LeaveType } from "@/types/models";
 
 const LEAVE_TYPE_CONFIG: Record<
-  LeaveType,
+  string,
   {
     label: string;
     color: string;
     icon: typeof FiCalendar;
   }
 > = {
-  annual: { label: 'Annual Leave', color: 'blue', icon: FiCalendar },
-  casual: { label: 'Casual Leave', color: 'green', icon: FiClock },
-  sick: { label: 'Sick Leave', color: 'red', icon: FiAlertCircle },
-  maternity: { label: 'Maternity Leave', color: 'purple', icon: FiCheckCircle },
-  paternity: { label: 'Paternity Leave', color: 'orange', icon: FiCheckCircle },
+  annual: { label: "Annual Leave", color: "blue", icon: FiCalendar },
+  casual: { label: "Casual Leave", color: "green", icon: FiClock },
+  sick: { label: "Sick Leave", color: "red", icon: FiAlertCircle },
+  maternity: { label: "Maternity Leave", color: "purple", icon: FiCheckCircle },
+  paternity: { label: "Paternity Leave", color: "orange", icon: FiCheckCircle },
+  study: { label: "Study Leave", color: "teal", icon: FiBook },
+};
+
+// Fallback so an unknown leave type never crashes the page
+const FALLBACK_CONFIG = {
+  label: "Leave",
+  color: "gray",
+  icon: FiCalendar,
 };
 
 interface BalanceCardProps {
@@ -35,20 +49,21 @@ interface BalanceCardProps {
 }
 
 export const BalanceCard: React.FC<BalanceCardProps> = ({ balance }) => {
-  const config = LEAVE_TYPE_CONFIG[balance.leave_type];
+  const config = LEAVE_TYPE_CONFIG[balance.leave_type] ?? FALLBACK_CONFIG;
+
   const utilizationPercentage =
     balance.allocated_days > 0
       ? (balance.used_days / balance.allocated_days) * 100
       : 0;
 
   const getStatusColor = () => {
-    if (balance.available_days === 0) return 'red';
-    if (balance.available_days <= 5) return 'orange';
-    return 'green';
+    if (balance.available_days === 0) return "red";
+    if (balance.available_days <= 5) return "orange";
+    return "green";
   };
 
   const statusColor = getStatusColor();
-  const isReapplicable = balance.leave_type === 'sick';
+  const isReapplicable = balance.leave_type === "sick";
 
   return (
     <Box
