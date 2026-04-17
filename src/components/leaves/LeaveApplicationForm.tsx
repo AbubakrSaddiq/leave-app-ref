@@ -28,16 +28,21 @@ import {
   Link,
   useDisclosure,
 } from "@chakra-ui/react";
-import { FiAlertTriangle, FiCheckCircle, FiCalendar, FiBook } from "react-icons/fi";
+import {
+  FiAlertTriangle,
+  FiCheckCircle,
+  FiCalendar,
+  FiBook,
+} from "react-icons/fi";
 import { useForm } from "react-hook-form";
 import { useCreateLeaveApplication } from "@/hooks/useLeaveApplication";
 import { LEAVE_TYPE_OPTIONS, STUDY_PROGRAMS } from "@/constants/leaveConstants";
 import { formatDisplayDate } from "@/utils/dateUtils";
 import { format, addYears, subDays } from "date-fns";
 import { LeaveType } from "@/types/models";
-import { 
-  useValidateLeaveDates, 
-  useMyDesiredMonths 
+import {
+  useValidateLeaveDates,
+  useMyDesiredMonths,
 } from "@/hooks/useDesiredLeaveMonths";
 import { useMyLeaveBalances } from "@/hooks/useLeaveBalance";
 import { DesiredLeaveMonthsForm } from "@/components/desiredMonths/DesiredLeaveMonthsForm";
@@ -49,7 +54,7 @@ interface LeaveFormData {
   end_date: string;
   reason: string;
   working_days: number;
-  study_program?: 'bsc' | 'msc' | 'phd';
+  study_program?: "bsc" | "msc" | "phd";
 }
 
 interface LeaveApplicationFormProps {
@@ -62,7 +67,11 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
   onCancel,
 }) => {
   // Modal control for desired months form
-  const { isOpen: isDesiredMonthsOpen, onOpen: onDesiredMonthsOpen, onClose: onDesiredMonthsClose } = useDisclosure();
+  const {
+    isOpen: isDesiredMonthsOpen,
+    onOpen: onDesiredMonthsOpen,
+    onClose: onDesiredMonthsClose,
+  } = useDisclosure();
 
   // Form state
   const {
@@ -90,13 +99,16 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
 
   const createMutation = useCreateLeaveApplication();
   const { data: balanceData } = useMyLeaveBalances();
-  const { data: desiredMonths, refetch: refetchDesiredMonths } = useMyDesiredMonths();
+  const { data: desiredMonths, refetch: refetchDesiredMonths } =
+    useMyDesiredMonths();
 
   const leaveType = watch("leave_type");
   const startDate = watch("start_date");
   const studyProgram = watch("study_program");
 
-  const currentBalance = balanceData?.balances.find(b => b.leave_type === leaveType);
+  const currentBalance = balanceData?.balances.find(
+    (b) => b.leave_type === leaveType,
+  );
 
   // ── RESET form when leave type changes ────────────────────────────────────
   useEffect(() => {
@@ -105,43 +117,49 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
     setResumptionDate("");
     setValue("working_days", 1);
     setValue("end_date", "");
-    
+
     // Clear study_program when not study leave
     if (leaveType !== LeaveType.STUDY) {
       setValue("study_program", undefined);
     }
   }, [leaveType, setValue]);
-  
+
   // Calculate end date for regular leave types
   useEffect(() => {
     if (leaveType === LeaveType.STUDY) {
       // Study leave: calculate based on program
       if (startDate && studyProgram) {
-        const program = STUDY_PROGRAMS.find(p => p.value === studyProgram);
+        const program = STUDY_PROGRAMS.find((p) => p.value === studyProgram);
         if (program) {
           const start = new Date(startDate);
           const end = subDays(addYears(start, program.durationYears), 1);
           const endDateStr = format(end, "yyyy-MM-dd");
-          
+
           setCalculatedEndDate(endDateStr);
           setValue("end_date", endDateStr);
           setValue("working_days", program.durationYears * 365);
           setWorkingDays(program.durationYears * 365);
-          
+
           // Resumption is next day after study leave
-          setResumptionDate(format(addYears(start, program.durationYears), "yyyy-MM-dd"));
+          setResumptionDate(
+            format(addYears(start, program.durationYears), "yyyy-MM-dd"),
+          );
         }
       }
     } else {
       // Regular leave: calculate based on working days
       const updateDates = async () => {
         if (!startDate || workingDays <= 0) return;
-        
+
         setIsCalculating(true);
         try {
-          const endDate = await leaveService.calculateEndDate(startDate, workingDays);
-          const resumption = await leaveService.calculateResumptionDate(endDate);
-          
+          const endDate = await leaveService.calculateEndDate(
+            startDate,
+            workingDays,
+          );
+          const resumption =
+            await leaveService.calculateResumptionDate(endDate);
+
           setCalculatedEndDate(endDate);
           setResumptionDate(resumption);
           setValue("end_date", endDate);
@@ -155,9 +173,9 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
   }, [startDate, workingDays, leaveType, studyProgram, setValue]);
 
   // Validate annual leave against desired months
-  const shouldValidateDesiredMonths = 
-    leaveType === LeaveType.ANNUAL && 
-    !!startDate && 
+  const shouldValidateDesiredMonths =
+    leaveType === LeaveType.ANNUAL &&
+    !!startDate &&
     !!calculatedEndDate &&
     !isCalculating &&
     !!desiredMonths;
@@ -168,19 +186,19 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
   } = useValidateLeaveDates(
     startDate,
     calculatedEndDate,
-    shouldValidateDesiredMonths
+    shouldValidateDesiredMonths,
   );
 
   const isAnnualLeaveBlocked = leaveType === LeaveType.ANNUAL && !desiredMonths;
-  const isDesiredMonthsInvalid = 
-    leaveType === LeaveType.ANNUAL && 
-    desiredMonthsValidation && 
+  const isDesiredMonthsInvalid =
+    leaveType === LeaveType.ANNUAL &&
+    desiredMonthsValidation &&
     !desiredMonthsValidation.is_valid;
 
-  const canSubmit = 
-    !isCalculating && 
+  const canSubmit =
+    !isCalculating &&
     !isValidatingDesiredMonths &&
-    !!calculatedEndDate && 
+    !!calculatedEndDate &&
     !isAnnualLeaveBlocked &&
     !isDesiredMonthsInvalid &&
     (leaveType !== LeaveType.STUDY || !!studyProgram);
@@ -239,7 +257,10 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
           </Select>
           {leaveType && (
             <FormHelperText>
-              {LEAVE_TYPE_OPTIONS.find((o) => o.value === leaveType)?.description}
+              {
+                LEAVE_TYPE_OPTIONS.find((o) => o.value === leaveType)
+                  ?.description
+              }
             </FormHelperText>
           )}
         </FormControl>
@@ -248,10 +269,13 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
         {isStudyLeave && (
           <FormControl isRequired isInvalid={!!errors.study_program}>
             <FormLabel>Study Program</FormLabel>
-            <Select 
-              {...register("study_program", { 
-                required: leaveType === LeaveType.STUDY ? "Study program is required" : false 
-              })} 
+            <Select
+              {...register("study_program", {
+                required:
+                  leaveType === LeaveType.STUDY
+                    ? "Study program is required"
+                    : false,
+              })}
               size="lg"
               placeholder="Select program"
             >
@@ -265,7 +289,8 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
             {studyProgram && (
               <FormHelperText>
                 <Icon as={FiBook} mr={1} />
-                Duration: {STUDY_PROGRAMS.find(p => p.value === studyProgram)?.duration}
+                Duration:{" "}
+                {STUDY_PROGRAMS.find((p) => p.value === studyProgram)?.duration}
               </FormHelperText>
             )}
           </FormControl>
@@ -278,7 +303,8 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
             <Box flex="1">
               <AlertTitle>Desired Leave Months Required</AlertTitle>
               <AlertDescription fontSize="sm" mt={2}>
-                Before applying for annual leave, you need to select your 2 desired leave months.
+                Before applying for annual leave, you need to select your 2
+                desired leave months.
                 <br />
                 <Link
                   color="blue.600"
@@ -318,11 +344,27 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
                 <HStack spacing={2} flexWrap="wrap">
                   {desiredMonths.preferred_months.map((monthNum) => {
                     const monthNames = [
-                      'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-                      'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'
+                      "Jan",
+                      "Feb",
+                      "Mar",
+                      "Apr",
+                      "May",
+                      "Jun",
+                      "Jul",
+                      "Aug",
+                      "Sep",
+                      "Oct",
+                      "Nov",
+                      "Dec",
                     ];
                     return (
-                      <Badge key={monthNum} colorScheme="blue" fontSize="xs" px={2} py={1}>
+                      <Badge
+                        key={monthNum}
+                        colorScheme="blue"
+                        fontSize="xs"
+                        px={2}
+                        py={1}
+                      >
                         {monthNames[monthNum - 1]}
                       </Badge>
                     );
@@ -361,7 +403,9 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
             <FormLabel>Start Date</FormLabel>
             <Input
               type="date"
-              {...register("start_date", { required: "Start date is required" })}
+              {...register("start_date", {
+                required: "Start date is required",
+              })}
               size="lg"
               min={format(new Date(), "yyyy-MM-dd")}
             />
@@ -377,7 +421,9 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
               <FormLabel>Start Date</FormLabel>
               <Input
                 type="date"
-                {...register("start_date", { required: "Start date is required" })}
+                {...register("start_date", {
+                  required: "Start date is required",
+                })}
                 size="lg"
                 min={format(new Date(), "yyyy-MM-dd")}
                 isDisabled={isAnnualLeaveBlocked}
@@ -408,21 +454,34 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
 
         {/* Calculated Summary */}
         {calculatedEndDate && !isAnnualLeaveBlocked && (
-          <Alert status="info" variant="left-accent" borderRadius="md" bg="blue.50">
+          <Alert
+            status="info"
+            variant="left-accent"
+            borderRadius="md"
+            bg="blue.50"
+          >
             <Box flex="1">
               <AlertTitle fontSize="md" mb={3} color="blue.900">
                 📊 Leave Summary
               </AlertTitle>
               <VStack align="stretch" spacing={3}>
-                <SummaryItem 
-                  label={isStudyLeave ? "PROGRAM END DATE" : "END DATE (Last day of leave)"} 
-                  value={formatDisplayDate(calculatedEndDate)} 
-                  color="orange.700" 
+                <SummaryItem
+                  label={
+                    isStudyLeave
+                      ? "PROGRAM END DATE"
+                      : "END DATE (Last day of leave)"
+                  }
+                  value={formatDisplayDate(calculatedEndDate)}
+                  color="orange.700"
                 />
-                <SummaryItem 
-                  label={isStudyLeave ? "RETURN TO WORK DATE" : "RESUMPTION DATE (Return to work)"} 
-                  value={formatDisplayDate(resumptionDate)} 
-                  color="green.700" 
+                <SummaryItem
+                  label={
+                    isStudyLeave
+                      ? "RETURN TO WORK DATE"
+                      : "RESUMPTION DATE (Return to work)"
+                  }
+                  value={formatDisplayDate(resumptionDate)}
+                  color="green.700"
                 />
                 <Divider />
                 <HStack justify="space-between">
@@ -430,10 +489,10 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
                     {isStudyLeave ? "Program Duration:" : "Total Working Days:"}
                   </Text>
                   <Badge colorScheme="purple" fontSize="md" px={3}>
-                    {isStudyLeave 
-                      ? STUDY_PROGRAMS.find(p => p.value === studyProgram)?.duration
-                      : `${workingDays} ${workingDays === 1 ? "day" : "days"}`
-                    }
+                    {isStudyLeave
+                      ? STUDY_PROGRAMS.find((p) => p.value === studyProgram)
+                          ?.duration
+                      : `${workingDays} ${workingDays === 1 ? "day" : "days"}`}
                   </Badge>
                 </HStack>
               </VStack>
@@ -442,25 +501,33 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
         )}
 
         {/* Desired Months Validation (Annual Leave Only) */}
-        {desiredMonthsValidation && leaveType === LeaveType.ANNUAL && !isValidatingDesiredMonths && (
-          <Alert
-            status={desiredMonthsValidation.is_valid ? "success" : "error"}
-            borderRadius="md"
-            variant="left-accent"
-          >
-            <AlertIcon as={desiredMonthsValidation.is_valid ? FiCheckCircle : FiAlertTriangle} />
-            <Box flex="1">
-              <AlertTitle fontSize="sm">
-                {desiredMonthsValidation.is_valid 
-                  ? "Dates Valid ✓" 
-                  : "Invalid Date Selection"}
-              </AlertTitle>
-              <AlertDescription fontSize="sm" mt={1}>
-                {desiredMonthsValidation.message}
-              </AlertDescription>
-            </Box>
-          </Alert>
-        )}
+        {desiredMonthsValidation &&
+          leaveType === LeaveType.ANNUAL &&
+          !isValidatingDesiredMonths && (
+            <Alert
+              status={desiredMonthsValidation.is_valid ? "success" : "error"}
+              borderRadius="md"
+              variant="left-accent"
+            >
+              <AlertIcon
+                as={
+                  desiredMonthsValidation.is_valid
+                    ? FiCheckCircle
+                    : FiAlertTriangle
+                }
+              />
+              <Box flex="1">
+                <AlertTitle fontSize="sm">
+                  {desiredMonthsValidation.is_valid
+                    ? "Dates Valid ✓"
+                    : "Invalid Date Selection"}
+                </AlertTitle>
+                <AlertDescription fontSize="sm" mt={1}>
+                  {desiredMonthsValidation.message}
+                </AlertDescription>
+              </Box>
+            </Alert>
+          )}
 
         {/* Reason Field */}
         <FormControl isInvalid={!!errors.reason} isRequired>
@@ -470,7 +537,11 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
               required: "Reason is required",
               minLength: { value: 10, message: "Minimum 10 characters" },
             })}
-            placeholder={isStudyLeave ? "Institution name, course details, etc..." : "Provide a detailed reason..."}
+            placeholder={
+              isStudyLeave
+                ? "Institution name, course details, etc..."
+                : "Provide a detailed reason..."
+            }
             size="lg"
             rows={4}
             isDisabled={isAnnualLeaveBlocked}
@@ -482,14 +553,20 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
         {createMutation.error && (
           <Alert status="error" borderRadius="md">
             <AlertIcon />
-            <AlertDescription>{(createMutation.error as Error).message}</AlertDescription>
+            <AlertDescription>
+              {(createMutation.error as Error).message}
+            </AlertDescription>
           </Alert>
         )}
 
         {/* Actions */}
         <HStack spacing={4} justify="flex-end" pt={4}>
           {onCancel && (
-            <Button variant="outline" onClick={onCancel} isDisabled={createMutation.isPending}>
+            <Button
+              variant="outline"
+              onClick={onCancel}
+              isDisabled={createMutation.isPending}
+            >
               Cancel
             </Button>
           )}
@@ -516,7 +593,15 @@ export const LeaveApplicationForm: React.FC<LeaveApplicationFormProps> = ({
   );
 };
 
-const SummaryItem = ({ label, value, color }: { label: string; value: string; color: string }) => (
+const SummaryItem = ({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: string;
+  color: string;
+}) => (
   <Box p={3} bg="white" borderRadius="md">
     <Text fontSize="xs" color="gray.600" fontWeight="semibold" mb={1}>
       {label}
